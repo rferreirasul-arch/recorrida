@@ -3,8 +3,8 @@
  *
  * Este é o ÚNICO arquivo no Apps Script da planilha (Extensões > Apps Script).
  * Todo o resto fica na biblioteca "Recorrida Núcleo" (identificador: RecorridaNucleo).
- * Para atualizar o app: publique uma nova versão da biblioteca e, aqui, em
- * Bibliotecas > RecorridaNucleo, troque o número da versão. Não precisa reimplantar o App da Web.
+ * Para atualizar: publique uma nova versão da biblioteca; aqui, em Bibliotecas > RecorridaNucleo, troque o
+ * número da versão; depois Implantar > Gerenciar implantações > lápis > Nova versão (a URL /exec não muda).
  *
  * Primeira vez (passo a passo no Roteiro de implantação):
  *  1. Bibliotecas (+) > cole o ID do script "Recorrida Núcleo" > identificador RecorridaNucleo > última versão.

@@ -162,8 +162,11 @@ def main():
     lista(doc, [
         "Colar os arquivos alterados de recorrida/apps-script/ no projeto **Recorrida Núcleo**.",
         "Implantar → Gerenciar implantações → lápis → **Nova versão** → Implantar (anotar o número).",
-        "Em cada planilha: Apps Script → Bibliotecas → RecorridaNucleo → escolher a **nova versão** → Salvar. "
-        "Não precisa mexer na implantação do App da Web: a URL /exec não muda.",
+        "Em cada planilha: Apps Script → Bibliotecas → RecorridaNucleo → escolher a **nova versão** → Salvar "
+        "(se a versão nova não aparecer na lista, recarregue a página).",
+        "Ainda em cada planilha: **Implantar → Gerenciar implantações → lápis → Versão: Nova versão → Implantar**. "
+        "O App da Web guarda uma cópia do código (com a versão da biblioteca); sem isso o app continua na versão antiga. "
+        "A URL /exec não muda.",
         "Se a mudança acrescentou chaves na Configuração, rodar configurar uma vez (não apaga nada).",
     ], numerada=True)
     caixa(doc, "Por que versão fixa e não \"mais recente\"? Uma versão com erro na biblioteca não derruba todas as propriedades "
