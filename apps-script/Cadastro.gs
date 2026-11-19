@@ -56,16 +56,14 @@ function importarCadastro(url) {
   const mov = achar("Movimentação opcional");
   if (mov) definirConfig_("Movimentação opcional", ehNao_(mov) ? "NÃO" : "SIM");
 
-  // Usuários: Nome | Gmail | Função | Acesso ("Só o app" / "App e planilha") | Ativo  →  Usuarios: E-mail | Nome | Ativo
+  // Usuários: Nome | Gmail | Função | Acesso | Ativo  →  Usuarios: E-mail | Nome | Ativo
+  // Acesso: "Só o app" · "App e planilha (editor)" · "App e planilha (só visualização)"
   const usuarios = linhas("Usuários", 5);
   const invalidos = usuarios.filter((l) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(l[1]));
   if (invalidos.length) relatorio.push("ATENÇÃO, e-mail inválido (não importado): " + invalidos.map((l) => l[0] + " <" + l[1] + ">").join(", "));
   acrescentar(ABA_USUARIOS, 0, usuarios.filter((l) => invalidos.indexOf(l) < 0)
     .map((l) => [l[1].toLowerCase(), l[0], l[4] ? sim(l[4]) : "SIM"]));
-  // O compartilhamento da planilha é feito à mão (Compartilhar, como Editor): aqui só a lista
-  const comPlanilha = usuarios.filter((l) => invalidos.indexOf(l) < 0 && /planilha|^sim$/i.test(l[3]));
-  relatorio.push("Compartilhar esta planilha (Editor) com: " +
-    (comPlanilha.length ? comPlanilha.map((l) => l[1].toLowerCase()).join(", ") : "ninguém marcado com \"App e planilha\""));
+  compartilharPlanilha_(ss, usuarios.filter((l) => invalidos.indexOf(l) < 0 && !ehNao_(l[4] || "SIM")), relatorio);
 
   // Potreiros: Potreiro | Nomes alternativos | Área (ha) | Observações  →  Potreiro | Nomes alternativos | Ativo
   acrescentar(ABA_POTREIROS, 0, linhas("Potreiros", 2).map((l) => [l[0], l[1], "SIM"]));
@@ -86,6 +84,33 @@ function importarCadastro(url) {
   const msg = "Cadastro importado de \"" + cad.getName() + "\":\n" + relatorio.join("\n");
   Logger.log(msg);
   return msg;
+}
+
+// Compartilha a planilha conforme a coluna Acesso do cadastro (o Google avisa a pessoa por e-mail).
+// Nunca rebaixa nem retira um acesso que a pessoa já tem: isso fica no botão Compartilhar.
+function compartilharPlanilha_(ss, usuarios, relatorio) {
+  const emails = (lista) => lista.map((u) => String(u.getEmail()).toLowerCase());
+  const dono = String(Session.getEffectiveUser().getEmail() || "").toLowerCase(); // quem roda (dono da planilha)
+  const editores = emails(ss.getEditors());
+  const leitores = emails(ss.getViewers());
+  const feitos = [], ja = [], erros = [];
+  usuarios.forEach((l) => {
+    const acesso = norm_(l[3]);
+    if (acesso.indexOf("planilha") < 0 && acesso !== "sim") return; // Só o app
+    const email = l[1].toLowerCase();
+    const editor = !/visualiz|leitor|ver\b/.test(acesso); // "App e planilha" sem detalhe = editor
+    if (email === dono || editores.indexOf(email) >= 0 || (!editor && leitores.indexOf(email) >= 0)) { ja.push(email); return; }
+    try {
+      if (editor) ss.addEditor(email); else ss.addViewer(email);
+      feitos.push(email + (editor ? " (editor)" : " (só visualização)"));
+    } catch (e) {
+      erros.push(email + ": " + e.message);
+    }
+  });
+  if (feitos.length) relatorio.push("Planilha compartilhada com: " + feitos.join(", "));
+  if (ja.length) relatorio.push("Já tinham acesso à planilha: " + ja.join(", "));
+  if (erros.length) relatorio.push("ATENÇÃO, não foi possível compartilhar: " + erros.join("; "));
+  if (!feitos.length && !ja.length && !erros.length) relatorio.push("Planilha: ninguém marcado com \"App e planilha\".");
 }
 
 // Grava um valor na aba Configuração (cria a chave se não existir)

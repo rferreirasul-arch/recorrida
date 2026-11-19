@@ -24,7 +24,7 @@ from docx_comum import APP, CINZA, RAIZ, caixa, checklist, lista, novo_documento
 ITENS = [
     ("Planilha de cadastro (.xlsx)",
      "Enviar o arquivo Cadastro-propriedade-Recorrida.xlsx e pedir que preencham:\n"
-     "• Usuários: nome e e-mail Google de cada pessoa, e o acesso de cada uma: **Só o app** ou **App e planilha**;\n"
+     "• Usuários: nome e e-mail Google de cada pessoa, e o acesso de cada uma: **Só o app**, **App e planilha (editor)** ou **(só visualização)**;\n"
      "• Potreiros: todos, com o nome usado no campo e os apelidos;\n"
      "• Minerais: produtos do cocho e kg por saco;\n"
      "• Categorias: conferir a sugestão e numerar na **ordem em que devem aparecer no app**;\n"
@@ -88,7 +88,7 @@ def gerar(d: dict, destino: Path, modelo=False):
 
     doc.add_heading("4. Conferir o cadastro", level=1)
     checklist(doc, [
-        "E-mails completos, sem espaços; cada pessoa com **Acesso** marcado (Só o app / App e planilha).",
+        "E-mails completos, sem espaços; cada pessoa com **Acesso** marcado (Só o app / App e planilha editor / só visualização). Editor também libera pessoas no app: só para quem responde pela propriedade.",
         "Potreiros sem nomes repetidos; apelidos separados por ponto e vírgula.",
         "Categorias numeradas na ordem do app, com a espécie certa.",
         "Minerais com kg por saco; medicamentos com tipo e unidade.",
@@ -102,7 +102,7 @@ def gerar(d: dict, destino: Path, modelo=False):
         "Fase A · Coleta: cadastro, marca e foto recebidos e conferidos.",
         "Fase B · Planilha e servidor criados; cadastro importado; /exec anotado.",
         "Fase C · App gerado (gerar.py) e publicado (Push).",
-        "Fase D · Teste feito; planilha compartilhada com quem marcou \"App e planilha\"; Boas-vindas enviado.",
+        "Fase D · Teste feito; planilha compartilhada (o importarCadastro faz e mostra no registro); Boas-vindas enviado.",
         "Primeira semana acompanhada.",
     ])
 

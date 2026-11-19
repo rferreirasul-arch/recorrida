@@ -59,7 +59,7 @@ def main():
              "uma mensagem pronta para WhatsApp ou e-mail e onde anotar o que já chegou. "
              "Envie o arquivo **Cadastro-propriedade-Recorrida.xlsx** (pasta Implantacao) e peça:")
     lista(doc, [
-        "**Usuários:** nome e **e-mail Google** de cada pessoa, e o acesso de cada uma: **Só o app** ou **App e planilha**.",
+        "**Usuários:** nome e **e-mail Google** de cada pessoa, e o acesso de cada uma: **Só o app**, **App e planilha (editor)** ou **App e planilha (só visualização)**.",
         "**Potreiros:** todos, com o nome que a equipe usa no campo e apelidos (nomes alternativos).",
         "**Categorias:** conferir a lista sugerida e numerar na **ordem em que devem aparecer no app**.",
         "**Minerais:** produtos do cocho e kg por saco.",
@@ -119,7 +119,7 @@ def main():
         "Abrir o endereço no celular, entrar com o seu Gmail (já está na aba Usuarios), conferir nome, logo e foto.",
         "Fazer uma recorrida de teste → Sincronizar → conferir a linha na aba Recorridas → excluir o teste pelo app.",
         "Conferir o Painel (menu Recorrida → Atualizar painel).",
-        "Compartilhar a planilha (como Editor) com quem marcou **\"App e planilha\"**: o importarCadastro lista esses e-mails.",
+        "Planilha: o importarCadastro já compartilha com quem marcou **\"App e planilha\"** (editor ou só visualização; o Google avisa por e-mail). Conferir o resultado no Registro de execução.",
         "Terminal: **uv run ferramentas/gerar_boas_vindas.py <slug>** → enviar aos usuários o .docx gerado em Propriedades/<Nome>/.",
         "Anotar no Recorrida app/LEIA-ME.md: endereço, planilha, /exec, ID do script e a data de entrega.",
         "Na primeira semana: acompanhar os registros; se necessário, trocar \"Movimentação opcional\" na aba Configuração.",

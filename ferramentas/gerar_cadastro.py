@@ -31,6 +31,7 @@ LINHAS_DADOS = 150  # linhas com formatação e listas suspensas
 TIPOS_MEDICAMENTO = ["Vermífugo", "Carrapaticida", "Endectocida", "Antibiótico", "Anti-inflamatório",
                      "Vacina clostridiose", "Vacina reprodutiva", "Vacina", "Suplemento injetável", "Outro"]
 ESPECIES = ["Bov", "Ovino", "Equino", "Caprino"]
+ACESSOS = ["Só o app", "App e planilha (editor)", "App e planilha (só visualização)"]
 
 
 def titulo(ws, texto, sub, ncol):
@@ -100,7 +101,8 @@ def montar(destino: Path):
         ("• Escreva só nas células AMARELAS. A linha cinza em itálico de cada aba é um exemplo e não é importada.", ""),
         ("• Propriedade: dados gerais e como o app deve funcionar.", ""),
         ("• Usuários: quem vai usar o app. Cada pessoa precisa de um e-mail Google (Gmail ou e-mail da empresa no Google). "
-         "Em \"Acesso\", escolha \"Só o app\" ou \"App e planilha\" (quem também vê e edita a planilha Google com todos os dados).", ""),
+         "Em \"Acesso\", escolha \"Só o app\", \"App e planilha (editor)\" (vê e altera a planilha Google com todos os dados, "
+         "inclusive libera ou bloqueia pessoas) ou \"App e planilha (só visualização)\". A planilha é compartilhada automaticamente.", ""),
         ("• Potreiros: todos os potreiros/piquetes com o nome que a equipe usa no campo. "
          "Em \"Nomes alternativos\", outros jeitos de chamar o mesmo potreiro, separados por ponto e vírgula.", ""),
         ("• Categorias: já vem com uma sugestão. Apague o que não usa, corrija os nomes e acrescente o que faltar. "
@@ -177,13 +179,13 @@ def montar(destino: Path):
     ws = wb.create_sheet("Usuários")
     titulo(ws, "Usuários", "quem vai usar o app; cada pessoa precisa de um e-mail Google", 5)
     cabecalho(ws, 2, ["Nome", "E-mail Google (Gmail)", "Função", "Acesso", "Ativo (SIM/NÃO)"],
-              [30, 36, 22, 20, 14])
+              [30, 36, 22, 32, 14])
     exemplo(ws, 3, ["João da Silva", "joao.silva@gmail.com", "Campo", "Só o app", "SIM"])
     area_dados(ws, 5)
     fim = 3 + LINHAS_DADOS
     lista(ws, f"C4:C{fim}", ["Administrador", "Gerente", "Campo", "Consulta"], "Função (pode digitar outra)", permitir_outro=True)
-    lista(ws, f"D4:D{fim}", ["Só o app", "App e planilha"],
-          "Só o app: usa o app no celular. App e planilha: também recebe a planilha Google com todos os dados")
+    lista(ws, f"D4:D{fim}", ACESSOS,
+          "Editor: vê e altera a planilha (e libera pessoas no app). Só visualização: só vê os dados")
     lista(ws, f"E4:E{fim}", ["SIM", "NÃO"], "NÃO: a pessoa fica bloqueada no app")
     dv = DataValidation(type="custom", formula1='AND(ISNUMBER(SEARCH("@",B4)),ISNUMBER(SEARCH(".",B4)),ISERROR(SEARCH(" ",B4)))',
                         allow_blank=True, showErrorMessage=True, errorTitle="E-mail inválido",

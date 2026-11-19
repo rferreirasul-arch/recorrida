@@ -29,7 +29,7 @@ ETAPAS = [  # (quem, título, detalhe)
     ("google", "6. Publicar o servidor", "Implantar → App da Web (executar como eu; qualquer pessoa).\nCopiar a URL /exec."),
     ("github", "7. Gerar o app", "propriedades/<slug>/propriedade.json (nome, cores, URL /exec).\npython3 ferramentas/gerar.py <slug> → commit → Push origin."),
     ("voce", "8. Testar", "Abrir o link, entrar com um Gmail da lista, fazer uma recorrida de teste,\nsincronizar, conferir na planilha e excluir o teste."),
-    ("google", "9. Compartilhar a planilha", "Com quem marcou \"App e planilha\" (como Editor).\nimportarCadastro já lista esses e-mails."),
+    ("google", "9. Compartilhar a planilha", "Automático no importarCadastro: editor ou só visualização,\nconforme o cadastro. Conferir no registro de execução."),
     ("voce", "10. Boas-vindas", "uv run ferramentas/gerar_boas_vindas.py <slug> → enviar o .docx aos usuários\n(parabéns, link do app e da planilha, como instalar no iPhone e Android)."),
     ("produtor", "11. Instalar e usar", "Cada pessoa instala no celular e entra uma vez com o Gmail."),
     ("voce", "12. Acompanhar a 1ª semana", "Conferir os registros. Se a equipe tiver dificuldade, mudar\n\"Movimentação opcional\" na aba Configuração (sem republicar)."),
