@@ -1,0 +1,904 @@
+/**
+ * Recorrida — servidor da planilha (Google Apps Script). Igual para todas as propriedades.
+ *
+ * Dois jeitos de usar (veja o LEIA-ME.md do repositório "recorrida"):
+ *  1. Biblioteca (recomendado): estes arquivos ficam no projeto "Recorrida Núcleo"; a planilha
+ *     de cada propriedade só tem o Ponte.gs, que repassa as chamadas.
+ *  2. Direto: cole Code.gs, Painel.gs e Dropbox.gs em Extensões > Apps Script da planilha.
+ * Nos dois casos: rode "configurar" uma vez e publique como App da Web.
+ * O que muda de uma propriedade para outra fica na aba "Configuração" da planilha.
+ */
+
+const CLIENT_ID = "997988874349-65tdu4nmrtj1p4sgg291ftg4b1dfna7i.apps.googleusercontent.com";
+
+// ---------------------------------------------------------------------
+// Serviços do script da planilha. Numa biblioteca, Propriedades, Cache e Lock "do script"
+// seriam os da biblioteca (iguais para todas as propriedades): por isso o Ponte.gs
+// entrega os seus com usarServicos() antes de cada chamada. Colado direto, valem os padrões.
+// ---------------------------------------------------------------------
+const SERVICOS_ = {};
+function usarServicos(s) { Object.assign(SERVICOS_, s || {}); }
+const props_ = () => SERVICOS_.props || PropertiesService.getScriptProperties();
+const cache_ = () => SERVICOS_.cache || CacheService.getScriptCache();
+const lock_ = () => SERVICOS_.lock || LockService.getScriptLock();
+
+const ABA_REGISTROS = "Recorridas";
+const ABA_POTREIROS = "Potreiros";
+const ABA_MINERAIS = "Minerais";
+const ABA_CATEGORIAS = "Categorias";
+const ABA_USUARIOS = "Usuarios";
+const ABA_APARELHOS = "Aparelhos";
+const ABA_FALTAS = "Faltas";
+const ABA_MEDICAMENTOS = "Medicamentos";   // cadastro dos medicamentos
+const ABA_MEDICACOES = "Medicações";       // eventos: uma linha por medicamento aplicado
+const ABA_MOVIMENTACOES = "Movimentações"; // eventos de animais: faltando, morte, venda, nascimento...
+const ABA_CONFIG = "Configuração";        // o que muda de uma propriedade para outra (Chave | Valor)
+// Linhas da aba Configuração: [chave, valor padrão, explicação]
+const CONFIG_PADRAO = [
+  ["Propriedade", "", "Nome da propriedade (aparece na cópia do Dropbox e no teste do servidor)."],
+  ["Movimentação opcional", "NÃO", "NÃO (como na Santa Rita): quando a contagem muda, o app já abre o quadro \"O que aconteceu?\" (morte, venda, transferência...). SIM: o quadro só abre se a pessoa ligar \"Registrar o que mudou\"; sem ligar, salva só a contagem. Vale nos aparelhos depois da próxima sincronização."],
+  ["Pasta Dropbox", "", "Pasta da cópia diária no Dropbox (ex.: /Fazenda X/Apps). Vazio: não exporta."],
+  ["Arquivo Dropbox", "Recorrida - consulta.xlsx", "Nome do arquivo .xlsx da cópia diária."],
+];
+
+const CABECALHO_MEDICAMENTOS = ["Medicamento", "Nomes alternativos", "Unidade da dose", "Ativo (SIM/NÃO)", "Tipo"];
+// Sugestões da coluna Tipo (dá para digitar outro); o Painel usa Carrapaticida e Vermífugo
+const TIPOS_MEDICAMENTO = ["Vermífugo", "Carrapaticida", "Endectocida", "Antibiótico", "Anti-inflamatório", "Vacina clostridiose", "Vacina reprodutiva", "Vacina", "Suplemento injetável", "Outro"];
+// Lote inteiro: uma linha por medicamento. Animais: uma linha por medicamento + dose + motivo,
+// com os brincos juntos. As linhas de uma recorrida são refeitas a cada alteração dela.
+const CABECALHO_MEDICACOES = ["Data", "Potreiro", "Aplicado em", "Categorias", "Quantidade de animais", "Dose por animal", "Total aplicado", "Unidade", "Medicamento", "Brincos", "Motivo", "Registrado por", "ID da recorrida"];
+const APLICADO_EM = { lote: "Todo o lote", animais: "Animal específico" };
+
+// Movimentações: explicam a diferença entre a contagem e a lotação anterior (uma linha por evento).
+// As linhas de uma recorrida são refeitas a cada alteração dela.
+const CABECALHO_MOVIMENTACOES = ["Data", "Potreiro", "Tipo", "Categoria", "Quantidade", "Nova categoria", "Outro potreiro", "Brinco", "Causa provável", "Faltando desde", "Registrado por", "ID da recorrida"];
+const TIPO_MOVIMENTO = {
+  faltando: "Faltando", retorno: "Retorno de faltando", perda: "Perda (não voltou)", morte: "Morte", venda: "Venda/saída", mudanca: "Mudança de categoria",
+  nascimento: "Nascimento", entrada: "Entrada (compra)", visitante: "Animais de outro potreiro", ajuste: "Ajuste de contagem",
+  transferencia: "Transferência para outro potreiro", veio: "Vieram de outro potreiro",
+};
+
+// Aba Faltas: uma linha por mineral em falta no depósito de um potreiro
+const COLUNAS_FALTAS = ["id", "data", "potreiro", "mineral", "registrado_por", "criado_em", "reposto_em", "reposto_por", "atualizado_em", "excluido", "recorrida_id"];
+const CABECALHO_FALTAS = ["ID", "Data", "Potreiro", "Mineral", "Registrado por", "Registrado em", "Reposto em", "Reposto por", "Atualizado em (não editar)", "Excluído", "ID da recorrida"];
+
+const CABECALHO_APARELHOS = ["Código", "E-mail", "Nome", "Aparelho", "Liberado em", "Último uso", "Ativo (SIM/NÃO)", "Resumo da chave (não editar)"];
+
+// Aba Recorridas: colunas fixas + uma coluna por categoria ("Animais: Vacas")
+// e uma por mineral ("Sacos: Proteico 30 M"), criadas conforme aparecem.
+const COLUNAS = [
+  "id", "data", "potreiro", "lotacao", "total_animais", "animais_txt", "total_sacos", "total_kg", "minerais_txt", "obs",
+  "registrado_por", "alterado_por", "criado_em", "atualizado_em", "sincronizado_em", "excluido",
+];
+const CABECALHO = [
+  "ID", "Data", "Potreiro", "Lotação", "Total animais", "Animais", "Sacos (total)", "Kg mineral (total)", "Mineral", "Observações",
+  "Registrado por", "Alterado por", "Criado em", "Atualizado em", "Sincronizado em", "Excluído",
+];
+const PREFIXO_ANIMAIS = "Animais: ";
+const PREFIXO_SACOS = "Sacos: ";
+// Coluna extra (criada no fim, se faltar): "SIM" quando o cocho já tinha mineral
+const COL_TEM_MINERAL = "Tem mineral";
+// Coluna oculta com os dados da medicação da recorrida (a aba Medicações é montada a partir dela)
+const COL_MEDICACAO = "Medicação (dados, não editar)";
+// Coluna oculta com a contagem, as movimentações e os animais faltando (a aba Movimentações sai dela).
+// As colunas "Animais: ..." guardam a lotação de referência (contados + faltando - de outro potreiro).
+const COL_MOVIMENTO = "Movimentação (dados, não editar)";
+const LOTACAO_TXT = { conferida: "Conferida", vazio: "Vazio", "": "Não conferida" };
+
+const CABECALHO_POTREIROS = [
+  "Potreiro", "Nomes alternativos", "Ativo (SIM/NÃO)",
+  "Cocho 1 (lat, lon)", "Cocho 1 precisão (m)", "Cocho 1 marcado por", "Cocho 1 marcado em",
+  "Cocho 2 (lat, lon)", "Cocho 2 precisão (m)", "Cocho 2 marcado por", "Cocho 2 marcado em",
+  "Contorno (KML: lon,lat lon,lat …)",
+];
+const CABECALHO_MINERAIS = ["Mineral", "Nomes alternativos", "Kg por saco", "Ativo (SIM/NÃO)"];
+// Aba Categorias: a coluna "Espécie" (Bov, Ovino...) separa os totais do Painel
+const CABECALHO_CATEGORIAS = ["Espécie", "Categoria", "Nomes alternativos", "Ativo (SIM/NÃO)"];
+
+// Listas iniciais: vazias. Cada propriedade traz as suas pela planilha de cadastro
+// (importarCadastro) ou digitando direto nas abas Potreiros, Minerais e Categorias.
+const POTREIROS_INICIAIS = [];
+const MINERAIS_INICIAIS = [];
+const CATEGORIAS_INICIAIS = [];
+
+// ---------------------------------------------------------------------
+// Rode UMA vez pelo editor (botão Executar) para criar as abas
+// ---------------------------------------------------------------------
+function configurar() {
+  const ss = SpreadsheetApp.getActive();
+  ss.setSpreadsheetLocale("pt_BR");
+  ss.setSpreadsheetTimeZone("America/Sao_Paulo");
+  const cabecalho = (sh, cab) => sh.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight("bold");
+
+  const reg = ss.getSheetByName(ABA_REGISTROS) || ss.insertSheet(ABA_REGISTROS);
+  if (reg.getLastRow() === 0) {
+    cabecalho(reg, CABECALHO).setBackground("#5a3018").setFontColor("#ffffff");
+    reg.setFrozenRows(1);
+    reg.getRange(2, 1, reg.getMaxRows() - 1, 1).setNumberFormat("@");
+    reg.getRange(2, 2, reg.getMaxRows() - 1, 1).setNumberFormat("dd/mm/yyyy");
+    reg.hideColumns(1);
+  }
+
+  const pot = ss.getSheetByName(ABA_POTREIROS) || ss.insertSheet(ABA_POTREIROS);
+  if (pot.getLastRow() === 0) {
+    cabecalho(pot, CABECALHO_POTREIROS);
+    if (POTREIROS_INICIAIS.length) pot.getRange(2, 1, POTREIROS_INICIAIS.length, 3).setValues(POTREIROS_INICIAIS.map((p) => [p[0], p[1], "SIM"]));
+    pot.getRange("D:D").setNumberFormat("@");
+    pot.getRange("H:H").setNumberFormat("@");
+    pot.setFrozenRows(1);
+  }
+
+  const min = ss.getSheetByName(ABA_MINERAIS) || ss.insertSheet(ABA_MINERAIS);
+  if (min.getLastRow() === 0) {
+    cabecalho(min, CABECALHO_MINERAIS);
+    if (MINERAIS_INICIAIS.length) min.getRange(2, 1, MINERAIS_INICIAIS.length, 4).setValues(MINERAIS_INICIAIS.map((m) => [m[0], m[1], m[2], "SIM"]));
+    min.setFrozenRows(1);
+  }
+
+  const cat = ss.getSheetByName(ABA_CATEGORIAS) || ss.insertSheet(ABA_CATEGORIAS);
+  if (cat.getLastRow() === 0) {
+    cabecalho(cat, CABECALHO_CATEGORIAS);
+    if (CATEGORIAS_INICIAIS.length) cat.getRange(2, 1, CATEGORIAS_INICIAIS.length, 4).setValues(CATEGORIAS_INICIAIS.map((c) => [c[0], c[1], c[2], "SIM"]));
+    cat.setFrozenRows(1);
+  }
+
+  const usu = ss.getSheetByName(ABA_USUARIOS) || ss.insertSheet(ABA_USUARIOS);
+  if (usu.getLastRow() === 0) {
+    usu.getRange(1, 1, 1, 3).setValues([["E-mail", "Nome", "Ativo (SIM/NÃO)"]]).setFontWeight("bold");
+    usu.appendRow([Session.getEffectiveUser().getEmail(), "Administrador", "SIM"]);
+    usu.setFrozenRows(1);
+  }
+  abaConfiguracao_();
+  abaAparelhos_();
+  abaFaltas_();
+  abaMedicamentos_();
+  if (!ss.getSheetByName(ABA_MEDICACOES)) abaMedicacoes_(); // se já existe, quem atualiza é a sincronização
+
+  const vazia = ss.getSheetByName("Página1") || ss.getSheetByName("Sheet1");
+  if (vazia && vazia.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(vazia);
+}
+
+// ---------------------------------------------------------------------
+// Entrada do App da Web
+// ---------------------------------------------------------------------
+function doPost(e) {
+  let saida;
+  try {
+    const req = JSON.parse(e.postData.contents);
+    if (req.action === "registrar") {
+      const u = verificarUsuario_(req.token);
+      saida = { ok: true, usuario: u, chave: registrarAparelho_(u, req.aparelho) };
+    } else {
+      const usuario = req.chave ? verificarAparelho_(req.chave) : verificarUsuario_(req.token);
+      if (req.action === "ping") saida = { ok: true, usuario: usuario, config: configParaApp_() };
+      else if (req.action === "sync") saida = sincronizar_(req.registros || [], req.alteracoes || [], usuario, req.faltas || []);
+      else if (req.action === "sair") { desativarAparelho_(req.chave); saida = { ok: true }; }
+      else throw erro_("Ação desconhecida.", "ACAO");
+    }
+  } catch (err) {
+    saida = { ok: false, erro: String(err.message || err), codigo: err.codigo || "ERRO" };
+  }
+  return ContentService.createTextOutput(JSON.stringify(saida)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet() {
+  const nome = lerConfig_()["Propriedade"] || SpreadsheetApp.getActive().getName();
+  return ContentService.createTextOutput("Recorrida (" + nome + "): servidor ativo.");
+}
+
+// ---------------------------------------------------------------------
+// Aba Configuração (Chave | Valor | Explicação)
+// ---------------------------------------------------------------------
+function abaConfiguracao_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(ABA_CONFIG);
+  if (!sh) {
+    sh = ss.insertSheet(ABA_CONFIG);
+    sh.getRange(1, 1, 1, 3).setValues([["Chave", "Valor", "Explicação"]]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+    sh.setColumnWidth(1, 190); sh.setColumnWidth(2, 260); sh.setColumnWidth(3, 620);
+  }
+  // Acrescenta as chaves que faltam (versões novas podem trazer chaves novas)
+  const chaves = () => sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().map((l) => norm_(l[0])) : [];
+  const tem = chaves();
+  const novas = CONFIG_PADRAO.filter((c) => tem.indexOf(norm_(c[0])) < 0);
+  if (novas.length) sh.getRange(sh.getLastRow() + 1, 1, novas.length, 3).setValues(novas);
+  const linhaMov = chaves().indexOf(norm_("Movimentação opcional")) + 2;
+  sh.getRange(linhaMov, 2).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(["SIM", "NÃO"], true).build());
+  sh.getRange(2, 3, sh.getLastRow() - 1, 1).setWrap(true).setFontColor("#666666");
+  return sh;
+}
+
+// { "Propriedade": "...", "Movimentação opcional": "NÃO", ... } (padrões para o que não estiver na aba)
+function lerConfig_() {
+  const cfg = {};
+  const porNorma = {};
+  CONFIG_PADRAO.forEach((c) => { cfg[c[0]] = c[1]; porNorma[norm_(c[0])] = c[0]; });
+  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_CONFIG);
+  if (sh && sh.getLastRow() > 1) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach((l) => {
+      const k = porNorma[norm_(l[0])] || String(l[0]).trim();
+      if (k) cfg[k] = String(l[1] == null ? "" : l[1]).trim();
+    });
+  }
+  return cfg;
+}
+
+// O que o app precisa saber (vai na resposta do ping e do sync)
+function configParaApp_() {
+  const c = lerConfig_();
+  return { propriedade: c["Propriedade"], movOpcional: norm_(c["Movimentação opcional"]) === "sim" };
+}
+
+// ---------------------------------------------------------------------
+// Login: confere o token do Google e a lista de usuários autorizados
+// ---------------------------------------------------------------------
+function verificarUsuario_(token) {
+  if (!token) throw erro_("Faça login com sua conta Google.", "AUTH");
+
+  const cache = cache_();
+  const chave = "tk_" + SpreadsheetApp.getActive().getId().slice(0, 12) + "_" + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)).slice(0, 40);
+  let email = cache.get(chave);
+
+  if (!email) {
+    const r = UrlFetchApp.fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(token),
+      { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) throw erro_("Sessão expirada. Entre novamente.", "AUTH");
+    const info = JSON.parse(r.getContentText());
+    if (info.aud !== CLIENT_ID) throw erro_("Login emitido para outro aplicativo.", "AUTH");
+    if (String(info.email_verified) !== "true") throw erro_("E-mail Google não verificado.", "AUTH");
+    email = String(info.email).toLowerCase();
+    const restante = Math.max(60, Math.min(21600, Number(info.exp) - Math.floor(Date.now() / 1000) - 30));
+    cache.put(chave, email, restante);
+  }
+
+  const aut = usuariosAutorizados_()[email];
+  if (!aut) throw erro_("O e-mail " + email + " não está autorizado. Peça ao administrador para incluí-lo na aba Usuarios.", "NEGADO");
+  return { email: email, nome: aut.nome || email };
+}
+
+// ---------------------------------------------------------------------
+// Aparelhos liberados (chave permanente por celular)
+// ---------------------------------------------------------------------
+function abaAparelhos_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(ABA_APARELHOS);
+  if (!sh) {
+    sh = ss.insertSheet(ABA_APARELHOS);
+    sh.getRange(1, 1, 1, CABECALHO_APARELHOS.length).setValues([CABECALHO_APARELHOS]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+    sh.hideColumns(CABECALHO_APARELHOS.length);
+  }
+  return sh;
+}
+
+// Começa com "k" para a planilha nunca confundir o texto com fórmula ou número
+function resumo_(chave) {
+  return "k" + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(chave))).replace(/=+$/, "");
+}
+
+function registrarAparelho_(usuario, aparelho) {
+  const chave = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
+  const r = resumo_(chave);
+  const agora = new Date();
+  abaAparelhos_().appendRow([r.slice(1, 7).toUpperCase(), usuario.email, usuario.nome,
+    String(aparelho || "").slice(0, 60), agora, agora, "SIM", r]);
+  return chave;
+}
+
+function linhaAparelho_(sh, chave) {
+  const n = sh.getLastRow() - 1;
+  if (n < 1) return null;
+  const r = resumo_(chave);
+  const col = sh.getRange(2, CABECALHO_APARELHOS.length, n, 1).getValues();
+  for (let i = 0; i < n; i++) if (col[i][0] === r) return i + 2;
+  return null;
+}
+
+function verificarAparelho_(chave) {
+  const sh = abaAparelhos_();
+  const linha = linhaAparelho_(sh, chave);
+  if (!linha) throw erro_("Este aparelho não está liberado. Entre com o Google para liberá-lo.", "APARELHO");
+  const l = sh.getRange(linha, 1, 1, CABECALHO_APARELHOS.length).getValues()[0];
+  const ativo = String(l[6]).trim().toUpperCase();
+  if (ativo === "NÃO" || ativo === "NAO") throw erro_("Este aparelho foi bloqueado. Entre com o Google para liberá-lo de novo.", "APARELHO");
+  const email = String(l[1]).trim().toLowerCase();
+  const aut = usuariosAutorizados_()[email];
+  if (!aut) throw erro_("O e-mail " + email + " não está autorizado. Peça ao administrador para incluí-lo na aba Usuarios.", "NEGADO");
+  sh.getRange(linha, 6).setValue(new Date());
+  return { email: email, nome: aut.nome || email };
+}
+
+function desativarAparelho_(chave) {
+  const sh = abaAparelhos_();
+  const linha = linhaAparelho_(sh, chave);
+  if (linha) sh.getRange(linha, 7).setValue("NÃO");
+}
+
+function usuariosAutorizados_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_USUARIOS);
+  const mapa = {};
+  if (!sh || sh.getLastRow() < 2) return mapa;
+  sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues().forEach((l) => {
+    const email = String(l[0]).trim().toLowerCase();
+    if (email && !ehNao_(l[2])) mapa[email] = { nome: String(l[1]).trim() };
+  });
+  return mapa;
+}
+
+// ---------------------------------------------------------------------
+// Sincronização: aplica as alterações de cadastro (potreiros novos, cochos,
+// categorias e minerais novos), grava as recorridas e devolve tudo
+// ---------------------------------------------------------------------
+function sincronizar_(recebidos, alteracoes, usuario, faltasRecebidas) {
+  const lock = lock_();
+  lock.waitLock(30000);
+  try {
+    alteracoes.forEach((a) => aplicarAlteracao_(a, usuario));
+
+    const sh = SpreadsheetApp.getActive().getSheetByName(ABA_REGISTROS);
+    const kgSaco = {};
+    lerMinerais_().forEach((m) => { kgSaco[m.nome] = m.kg; });
+    const cab = garantirCabecalho_(sh, recebidos);
+    const base = lerRegistros_(sh, cab);
+    const agora = new Date().toISOString();
+    const novos = [];
+    const tocados = []; // recorridas gravadas agora (refazem as linhas de medicação)
+
+    recebidos.forEach((r) => {
+      if (!r || !r.id) return;
+      const pos = base.indice[r.id];
+      if (pos !== undefined) {
+        const atual = base.lista[pos];
+        if (String(atual.atualizado_em) >= String(r.atualizado_em)) return; // a planilha já tem versão igual ou mais nova
+        r.registrado_por = atual.registrado_por;
+        r.criado_em = atual.criado_em;
+        r.alterado_por = usuario.nome;
+        r.sincronizado_em = agora;
+        sh.getRange(pos + 2, 1, 1, cab.length).setValues([paraLinha_(r, cab, kgSaco)]);
+        base.lista[pos] = r;
+        tocados.push(r);
+      } else {
+        r.registrado_por = usuario.nome; // quem enviou, conferido pelo login (nome da aba Usuarios)
+        r.alterado_por = "";
+        r.sincronizado_em = agora;
+        base.indice[r.id] = base.lista.length;
+        base.lista.push(r);
+        novos.push(paraLinha_(r, cab, kgSaco));
+        tocados.push(r);
+      }
+    });
+
+    if (novos.length) sh.getRange(sh.getLastRow() + 1, 1, novos.length, cab.length).setValues(novos);
+    sincronizarMedicacoes_(tocados, base.lista);
+    sincronizarMovimentacoes_(tocados, base.lista);
+    return {
+      ok: true,
+      usuario: usuario,
+      registros: base.lista,
+      faltas: sincronizarFaltas_(faltasRecebidas || [], usuario),
+      catalogo: { potreiros: lerPotreiros_(), minerais: lerMinerais_(), categorias: lerCategorias_(), medicamentos: lerMedicamentos_() },
+      config: configParaApp_(),
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------------------------------------------------------------------
+// Cadastros
+// ---------------------------------------------------------------------
+const norm_ = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const ehNao_ = (v) => { const a = String(v).trim().toUpperCase(); return a === "NÃO" || a === "NAO"; };
+
+function linhaPorNome_(sh, nome, coluna) {
+  const n = sh.getLastRow() - 1;
+  if (n < 1) return null;
+  const alvo = norm_(nome);
+  const col = sh.getRange(2, coluna || 1, n, 1).getValues();
+  for (let i = 0; i < n; i++) if (norm_(col[i][0]) === alvo) return i + 2;
+  return null;
+}
+
+function aplicarAlteracao_(a, usuario) {
+  if (!a || !a.tipo) return;
+  const ss = SpreadsheetApp.getActive();
+  const nome = String(a.nome || a.potreiro || "").trim().slice(0, 80);
+  if (!nome) return;
+
+  if (a.tipo === "potreiro" || a.tipo === "mineral" || a.tipo === "categoria" || a.tipo === "medicamento") {
+    const aba = { potreiro: ABA_POTREIROS, mineral: ABA_MINERAIS, categoria: ABA_CATEGORIAS }[a.tipo];
+    const sh = a.tipo === "medicamento" ? abaMedicamentos_() : ss.getSheetByName(aba);
+    const cc = a.tipo === "categoria" ? colunasCategorias_(sh) : null;
+    if (linhaPorNome_(sh, nome, cc ? cc.nome + 1 : 1)) return; // já existe
+    const txt = (v, max) => String(v || "").trim().slice(0, max);
+    const alt = txt(a.alternativos, 200);
+    const kg = Number(a.kg);
+    let linha = a.tipo === "mineral" ? [nome, alt, kg > 0 && kg <= 1000 ? kg : "", "SIM"] : [nome, alt, "SIM"];
+    if (a.tipo === "medicamento") {
+      // Unidade e Tipo vêm da janela de cadastro do app (Tipo pela posição no cabeçalho)
+      const iTipo = colunaTipo_(sh);
+      linha = new Array(Math.max(sh.getLastColumn(), CABECALHO_MEDICAMENTOS.length)).fill("");
+      linha[0] = nome; linha[1] = alt; linha[2] = txt(a.unidade, 30) || "mL"; linha[3] = "SIM";
+      if (iTipo >= 0) linha[iTipo] = txt(a.tipoMed, 80);
+    }
+    if (cc) {
+      // Monta a linha pelo cabeçalho; a espécie vem do app (versões antigas mandam em branco)
+      linha = new Array(Math.max(sh.getLastColumn(), 3)).fill("");
+      linha[cc.nome] = nome;
+      if (cc.alternativos >= 0) linha[cc.alternativos] = alt;
+      if (cc.especie >= 0) linha[cc.especie] = txt(a.especie, 30);
+      if (cc.ativo >= 0) linha[cc.ativo] = "SIM";
+    }
+    sh.appendRow(linha);
+    const obs = "Incluído pelo app por " + usuario.nome + " em " + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
+    sh.getRange(sh.getLastRow(), cc ? cc.nome + 1 : 1).setNote(obs);
+    return;
+  }
+
+  if (a.tipo === "cocho") {
+    const sh = ss.getSheetByName(ABA_POTREIROS);
+    let linha = linhaPorNome_(sh, nome);
+    if (!linha) { sh.appendRow([nome, "", "SIM"]); linha = sh.getLastRow(); }
+    const n = Number(a.n) === 2 ? 2 : 1;
+    const col = n === 1 ? 4 : 8;
+    const atual = sh.getRange(linha, col + 3).getValue();
+    const em = new Date(a.em || Date.now());
+    if (atual instanceof Date && atual > em) return; // já tem marcação mais nova
+    const lat = Number(a.lat), lon = Number(a.lon);
+    if (!isFinite(lat) || !isFinite(lon)) return;
+    sh.getRange(linha, col, 1, 4).setValues([[
+      lat.toFixed(6) + ", " + lon.toFixed(6), Math.round(Number(a.precisao) || 0), usuario.nome, em,
+    ]]);
+  }
+}
+
+function lerPotreiros_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_POTREIROS);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const tz = Session.getScriptTimeZone();
+  const cocho = (pos, prec, por, em) => {
+    const m = String(pos || "").match(/(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)/);
+    if (!m) return null;
+    return {
+      lat: Number(m[1]), lon: Number(m[2]), precisao: Number(prec) || "",
+      por: String(por || ""), em: em instanceof Date ? Utilities.formatDate(em, tz, "yyyy-MM-dd'T'HH:mm:ss") : String(em || ""),
+    };
+  };
+  return sh.getRange(2, 1, sh.getLastRow() - 1, CABECALHO_POTREIROS.length).getValues()
+    .filter((l) => String(l[0]).trim() !== "")
+    .map((l) => ({
+      nome: String(l[0]).trim(),
+      alternativos: String(l[1] || "").trim(),
+      ativo: !ehNao_(l[2]),
+      cochos: [cocho(l[3], l[4], l[5], l[6]), cocho(l[7], l[8], l[9], l[10])],
+      contorno: String(l[11] || "").trim(),
+    }));
+}
+
+function lerMinerais_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_MINERAIS);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues()
+    .filter((l) => String(l[0]).trim() !== "")
+    .map((l) => ({ nome: String(l[0]).trim(), alternativos: String(l[1] || "").trim(), kg: Number(l[2]) || "", ativo: !ehNao_(l[3]) }));
+}
+
+// Posição (base 0) de cada coluna da aba Categorias, pelo cabeçalho.
+// Sem a coluna "Espécie", vale o formato antigo: Categoria | Nomes alternativos | Ativo.
+function colunasCategorias_(sh) {
+  const cab = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(norm_);
+  const achar = (ini) => cab.findIndex((c) => c.indexOf(ini) === 0);
+  const especie = achar("especie");
+  const nome = achar("categoria");
+  if (nome < 0) return { especie: -1, nome: 0, alternativos: 1, ativo: 2 };
+  return { especie, nome, alternativos: achar("nomes alternativos"), ativo: achar("ativo") };
+}
+
+function lerCategorias_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_CATEGORIAS);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const c = colunasCategorias_(sh);
+  const v = (l, i) => (i >= 0 ? String(l[i] == null ? "" : l[i]).trim() : "");
+  return sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(sh.getLastColumn(), 3)).getValues()
+    .filter((l) => v(l, c.nome) !== "")
+    .map((l) => ({ nome: v(l, c.nome), alternativos: v(l, c.alternativos), ativo: !ehNao_(v(l, c.ativo)), especie: v(l, c.especie) }));
+}
+
+// ---------------------------------------------------------------------
+// Aba Recorridas
+// ---------------------------------------------------------------------
+// Garante as colunas fixas e cria as colunas de categoria/mineral que faltam
+function garantirCabecalho_(sh, recebidos) {
+  let cab = sh.getLastColumn() ? sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String) : [];
+  if (cab.slice(0, CABECALHO.length).join("|") !== CABECALHO.join("|")) {
+    sh.getRange(1, 1, 1, CABECALHO.length).setValues([CABECALHO]);
+    cab = CABECALHO.concat(cab.slice(CABECALHO.length));
+  }
+  const faltam = [];
+  recebidos.forEach((r) => {
+    (r.animais || []).forEach((a) => { const t = PREFIXO_ANIMAIS + a.categoria; if (cab.indexOf(t) < 0 && faltam.indexOf(t) < 0) faltam.push(t); });
+    (r.minerais || []).forEach((m) => { const t = PREFIXO_SACOS + m.mineral; if (cab.indexOf(t) < 0 && faltam.indexOf(t) < 0) faltam.push(t); });
+  });
+  if (cab.indexOf(COL_TEM_MINERAL) < 0) faltam.push(COL_TEM_MINERAL);
+  if (cab.indexOf(COL_MEDICACAO) < 0) faltam.push(COL_MEDICACAO);
+  if (cab.indexOf(COL_MOVIMENTO) < 0) faltam.push(COL_MOVIMENTO);
+  if (faltam.length) {
+    const falta = cab.length + faltam.length - sh.getMaxColumns();
+    if (falta > 0) sh.insertColumnsAfter(sh.getMaxColumns(), falta);
+    sh.getRange(1, cab.length + 1, 1, faltam.length).setValues([faltam]).setFontWeight("bold");
+    cab = cab.concat(faltam);
+    const iMed = cab.indexOf(COL_MEDICACAO);
+    [COL_MEDICACAO, COL_MOVIMENTO].forEach((col) => {
+      if (faltam.indexOf(col) < 0) return;
+      const i = cab.indexOf(col);
+      sh.getRange(2, i + 1, Math.max(sh.getMaxRows() - 1, 1), 1).setNumberFormat("@");
+      sh.hideColumns(i + 1);
+    });
+  }
+  return cab;
+}
+
+function lerRegistros_(sh, cab) {
+  const lista = [];
+  const indice = {};
+  const n = sh.getLastRow() - 1;
+  if (n < 1) return { lista: lista, indice: indice };
+  const tz = Session.getScriptTimeZone();
+  const lotacao = { conferida: "conferida", vazio: "vazio" };
+  sh.getRange(2, 1, n, cab.length).getValues().forEach((l) => {
+    const r = { animais: [], minerais: [] };
+    COLUNAS.forEach((c, i) => {
+      let v = l[i];
+      if (v instanceof Date) v = c === "data" ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v.toISOString();
+      r[c] = v;
+    });
+    if (!r.id) return;
+    r.excluido = r.excluido === true || String(r.excluido).toUpperCase() === "TRUE";
+    r.lotacao = lotacao[norm_(r.lotacao)] || "";
+    const iTem = cab.indexOf(COL_TEM_MINERAL);
+    r.tem_mineral = iTem >= 0 && norm_(l[iTem]) === "sim";
+    const iMed = cab.indexOf(COL_MEDICACAO);
+    r.medicacao = null;
+    if (iMed >= 0 && String(l[iMed]).trim()) { try { r.medicacao = JSON.parse(l[iMed]); } catch (e) { r.medicacao = null; } }
+    const iMov = cab.indexOf(COL_MOVIMENTO);
+    if (iMov >= 0 && String(l[iMov]).trim()) {
+      try {
+        const mv = JSON.parse(l[iMov]);
+        if (mv.contados) r.contados = mv.contados;
+        if (mv.movimentos) r.movimentos = mv.movimentos;
+        if (mv.faltando) r.faltando = mv.faltando;
+        if (mv.gerados) r.gerados = mv.gerados;
+        if (mv.origem) r.origem = mv.origem;
+      } catch (e) { /* coluna corrompida: ignora */ }
+    }
+    for (let i = CABECALHO.length; i < cab.length; i++) {
+      const q = Number(l[i]);
+      if (!q) continue;
+      if (cab[i].indexOf(PREFIXO_ANIMAIS) === 0) r.animais.push({ categoria: cab[i].slice(PREFIXO_ANIMAIS.length), qtd: q });
+      if (cab[i].indexOf(PREFIXO_SACOS) === 0) r.minerais.push({ mineral: cab[i].slice(PREFIXO_SACOS.length), sacos: q });
+    }
+    ["total_animais", "animais_txt", "total_sacos", "total_kg", "minerais_txt", "sincronizado_em"].forEach((c) => delete r[c]);
+    indice[r.id] = lista.length;
+    lista.push(r);
+  });
+  return { lista: lista, indice: indice };
+}
+
+function paraLinha_(r, cab, kgSaco) {
+  const animais = r.lotacao === "conferida" ? (r.animais || []) : [];
+  const minerais = r.minerais || [];
+  const totalAnimais = animais.reduce((s, a) => s + Number(a.qtd || 0), 0);
+  const totalSacos = minerais.reduce((s, m) => s + Number(m.sacos || 0), 0);
+  const semKg = minerais.some((m) => !kgSaco[m.mineral]);
+  const totalKg = minerais.reduce((s, m) => s + Number(m.sacos || 0) * (Number(kgSaco[m.mineral]) || 0), 0);
+  const calc = {
+    lotacao: LOTACAO_TXT[r.lotacao || ""],
+    total_animais: r.lotacao === "" ? "" : totalAnimais,
+    animais_txt: r.lotacao === "vazio" ? "Vazio" : animais.map((a) => a.qtd + " " + a.categoria).join("; "),
+    total_sacos: minerais.length ? totalSacos : "",
+    total_kg: minerais.length && !semKg ? totalKg : "",
+    minerais_txt: minerais.map((m) => m.sacos + " sc " + m.mineral).join("; "),
+  };
+  const linha = cab.map((c, i) => {
+    if (i < COLUNAS.length) {
+      const k = COLUNAS[i];
+      if (k in calc) return calc[k];
+      const v = r[k];
+      if (k === "data" && v) {
+        const p = String(v).split("-");
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      }
+      if (k === "excluido") return v === true;
+      return v === undefined || v === null ? "" : v;
+    }
+    if (c.indexOf(PREFIXO_ANIMAIS) === 0) {
+      const a = animais.find((x) => x.categoria === c.slice(PREFIXO_ANIMAIS.length));
+      return a ? Number(a.qtd) : "";
+    }
+    if (c.indexOf(PREFIXO_SACOS) === 0) {
+      const m = minerais.find((x) => x.mineral === c.slice(PREFIXO_SACOS.length));
+      return m ? Number(m.sacos) : "";
+    }
+    if (c === COL_TEM_MINERAL) return r.tem_mineral ? "SIM" : "";
+    if (c === COL_MEDICACAO) return r.medicacao ? JSON.stringify(r.medicacao) : "";
+    if (c === COL_MOVIMENTO) {
+      const mv = {};
+      if (r.lotacao === "conferida" && r.contados && r.contados.length) mv.contados = r.contados;
+      if (r.movimentos && r.movimentos.length) mv.movimentos = r.movimentos;
+      if (r.lotacao === "conferida" && r.faltando && r.faltando.length) mv.faltando = r.faltando;
+      if (r.gerados && r.gerados.length) mv.gerados = r.gerados; // lotações atualizadas em outros potreiros
+      if (r.origem) mv.origem = r.origem;                         // criada pela recorrida de outro potreiro
+      return Object.keys(mv).length ? JSON.stringify(mv) : "";
+    }
+    return "";
+  });
+  return linha;
+}
+
+// ---------------------------------------------------------------------
+// Aba Faltas (mineral em falta no depósito)
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Medicamentos: cadastro (aba Medicamentos) e aplicações (aba Medicações)
+// ---------------------------------------------------------------------
+function abaMedicamentos_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(ABA_MEDICAMENTOS);
+  if (!sh) {
+    sh = ss.insertSheet(ABA_MEDICAMENTOS);
+    sh.getRange(1, 1, 1, CABECALHO_MEDICAMENTOS.length).setValues([CABECALHO_MEDICAMENTOS]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  // Coluna Tipo (versões antigas não tinham): cabeçalho e lista de sugestões
+  if (colunaTipo_(sh) < 0) {
+    const c = Math.max(sh.getLastColumn(), CABECALHO_MEDICAMENTOS.length - 1) + 1;
+    sh.getRange(1, c).setValue("Tipo").setFontWeight("bold");
+    sh.getRange(2, c, Math.max(sh.getMaxRows() - 1, 1), 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(TIPOS_MEDICAMENTO, true).setAllowInvalid(true).build());
+  }
+  return sh;
+}
+
+// Posição (base 0) da coluna Tipo da aba Medicamentos, pelo cabeçalho (-1 se não houver)
+function colunaTipo_(sh) {
+  if (!sh.getLastColumn()) return -1;
+  return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(norm_).findIndex((c) => c.indexOf("tipo") === 0);
+}
+
+// Devolve { sh, refazer }: refazer = o cabeçalho era de uma versão anterior e as linhas precisam ser refeitas
+function abaMedicacoes_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(ABA_MEDICACOES);
+  if (!sh) {
+    sh = ss.insertSheet(ABA_MEDICACOES);
+    sh.setFrozenRows(1);
+  }
+  // Cabeçalho novo (ou de uma versão anterior): apaga as linhas, regrava e oculta só a coluna do ID
+  const nCol = CABECALHO_MEDICACOES.length;
+  const atual = sh.getRange(1, 1, 1, Math.max(nCol, sh.getLastColumn())).getValues()[0].map(String);
+  if (atual.slice(0, nCol).join("|") !== CABECALHO_MEDICACOES.join("|") || atual.slice(nCol).some((v) => v.trim())) {
+    sh.clearContents();
+    sh.getRange(1, 1, 1, nCol).setValues([CABECALHO_MEDICACOES]).setFontWeight("bold").setBackground("#2f5b8a").setFontColor("#ffffff");
+    const n = Math.max(sh.getMaxRows() - 1, 1);
+    sh.getRange(2, 1, n, 1).setNumberFormat("dd/mm/yyyy");
+    sh.getRange(2, 10, n, 1).setNumberFormat("@");
+    sh.getRange(2, nCol, n, 1).setNumberFormat("@");
+    sh.showColumns(1, Math.max(nCol, sh.getMaxColumns()));
+    sh.hideColumns(nCol, 1);
+    return { sh: sh, refazer: true };
+  }
+  return { sh: sh, refazer: false };
+}
+
+// ---------------------------------------------------------------------
+// Aba Movimentações (montada a partir da coluna oculta da aba Recorridas)
+// ---------------------------------------------------------------------
+function abaMovimentacoes_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(ABA_MOVIMENTACOES);
+  let refazer = false;
+  if (!sh) {
+    sh = ss.insertSheet(ABA_MOVIMENTACOES);
+    sh.setFrozenRows(1);
+    refazer = true;
+  }
+  const nCol = CABECALHO_MOVIMENTACOES.length;
+  const atual = sh.getRange(1, 1, 1, Math.max(nCol, sh.getLastColumn())).getValues()[0].map(String);
+  if (refazer || atual.slice(0, nCol).join("|") !== CABECALHO_MOVIMENTACOES.join("|") || atual.slice(nCol).some((v) => v.trim())) {
+    sh.clearContents();
+    sh.getRange(1, 1, 1, nCol).setValues([CABECALHO_MOVIMENTACOES]).setFontWeight("bold").setBackground("#6b4a2f").setFontColor("#ffffff");
+    const n = Math.max(sh.getMaxRows() - 1, 1);
+    sh.getRange(2, 1, n, 1).setNumberFormat("dd/mm/yyyy");
+    sh.getRange(2, 8, n, 1).setNumberFormat("@");
+    sh.getRange(2, 10, n, 1).setNumberFormat("dd/mm/yyyy");
+    sh.getRange(2, nCol, n, 1).setNumberFormat("@");
+    sh.showColumns(1, Math.max(nCol, sh.getMaxColumns()));
+    sh.hideColumns(nCol, 1);
+    return { sh: sh, refazer: true };
+  }
+  return { sh: sh, refazer: false };
+}
+
+function linhasMovimentacao_(r) {
+  if (r.excluido || !r.movimentos || !r.movimentos.length) return [];
+  const data = (iso) => { const p = String(iso || "").split("-"); return p.length === 3 ? new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])) : ""; };
+  return r.movimentos.map((m) => [
+    data(r.data), r.potreiro, TIPO_MOVIMENTO[m.tipo] || m.tipo, m.categoria, Number(m.qtd) || "", m.para || "", m.outro || (m.ja ? "(já atualizado)" : ""),
+    m.brinco || "", m.causa || "", m.desde ? data(m.desde) : m.tipo === "faltando" ? data(r.data) : "", r.registrado_por || "", r.id,
+  ]);
+}
+
+function sincronizarMovimentacoes_(tocados, todos) {
+  const aba = abaMovimentacoes_();
+  const sh = aba.sh;
+  if (aba.refazer) tocados = (todos || []).filter((r) => r.movimentos && r.movimentos.length && !r.excluido);
+  const nCol = CABECALHO_MOVIMENTACOES.length;
+  let linhas = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, nCol).getValues().filter((l) => String(l[nCol - 1]).trim()) : [];
+  const mexer = tocados.filter((r) => (r.movimentos && r.movimentos.length) || linhas.some((l) => String(l[nCol - 1]) === r.id));
+  if (!mexer.length) return;
+  const ids = {};
+  mexer.forEach((r) => { ids[r.id] = true; });
+  linhas = linhas.filter((l) => !ids[String(l[nCol - 1])]);
+  mexer.forEach((r) => { linhas = linhas.concat(linhasMovimentacao_(r)); });
+  const t = (v) => (v instanceof Date ? v.getTime() : 0);
+  linhas = linhas.map((l, i) => [l, i]).sort((a, b) => t(a[0][0]) - t(b[0][0]) || a[1] - b[1]).map((x) => x[0]);
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, nCol).clearContent();
+  if (linhas.length) sh.getRange(2, 1, linhas.length, nCol).setValues(linhas);
+}
+
+function lerMedicamentos_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_MEDICAMENTOS);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const iTipo = colunaTipo_(sh);
+  return sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(sh.getLastColumn(), 4)).getValues()
+    .filter((l) => String(l[0]).trim() !== "")
+    .map((l) => ({ nome: String(l[0]).trim(), alternativos: String(l[1] || "").trim(), unidade: String(l[2] || "").trim() || "mL", ativo: !ehNao_(l[3]),
+      tipo: iTipo >= 0 ? String(l[iTipo] || "").trim() : "" }));
+}
+
+// Linhas da aba Medicações para uma recorrida
+function linhasMedicacao_(r, unidade) {
+  const med = r.medicacao;
+  if (r.excluido || !med) return [];
+  const p = String(r.data || "").split("-");
+  const data = p.length === 3 ? new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])) : "";
+  const linha = (qtd, m, brincos, motivo, categorias) =>
+    [data, r.potreiro, APLICADO_EM[med.modo === "animais" ? "animais" : "lote"], categorias, qtd, Number(m.dose),
+      qtd ? Math.round(Number(qtd) * Number(m.dose) * 100) / 100 : "", unidade(m.medicamento), m.medicamento, brincos, motivo, r.registrado_por || "", r.id];
+  // Lote: o medicamento pode ter ido só para algumas categorias (qtd = soma delas)
+  if (med.modo !== "animais") return (med.itens || []).map((m) => (m.categorias && m.categorias.length)
+    ? linha(m.qtd || "", m, "", "", m.categorias.join(", ")).map((v, i) => (i === 2 ? "Categorias do lote" : v))
+    : linha(med.qtd || "", m, "", "", "Todas"));
+  // Animais: junta os que receberam o mesmo medicamento, dose e motivo (brinco é opcional)
+  const grupos = {};
+  const ordem = [];
+  (med.animais || []).forEach((a) => (a.itens || []).forEach((m) => {
+    const k = [m.medicamento, m.dose, a.motivo || ""].join("|");
+    if (!grupos[k]) { grupos[k] = { m: m, motivo: a.motivo || "", brincos: [], semBrinco: 0 }; ordem.push(k); }
+    const b = String(a.brinco || "").trim();
+    if (!b) grupos[k].semBrinco++;
+    else if (grupos[k].brincos.indexOf(b) < 0) grupos[k].brincos.push(b);
+  }));
+  return ordem.map((k) => {
+    const g = grupos[k];
+    const sem = g.semBrinco ? (g.semBrinco === 1 ? "1 sem brinco" : g.semBrinco + " sem brinco") : "";
+    const txt = g.brincos.join(", ") + (g.brincos.length && sem ? " + " : "") + sem;
+    return linha(g.brincos.length + g.semBrinco, g.m, txt, g.motivo, "");
+  });
+}
+
+// Refaz as linhas das recorridas gravadas agora, em ordem de data
+// todos: todas as recorridas (usadas para refazer a aba quando o cabeçalho muda de versão)
+function sincronizarMedicacoes_(tocados, todos) {
+  abaMedicamentos_(); // garante a coluna Tipo
+  const aba = abaMedicacoes_();
+  const sh = aba.sh;
+  if (aba.refazer) tocados = (todos || []).filter((r) => r.medicacao && !r.excluido);
+  const nCol = CABECALHO_MEDICACOES.length;
+  let linhas = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, nCol).getValues().filter((l) => String(l[nCol - 1]).trim()) : [];
+  const comMed = tocados.filter((r) => r.medicacao || linhas.some((l) => String(l[nCol - 1]) === r.id));
+  if (comMed.length) {
+    const unid = {};
+    lerMedicamentos_().forEach((m) => { unid[norm_(m.nome)] = m.unidade; });
+    const unidade = (nome) => unid[norm_(nome)] || "mL";
+    const ids = {};
+    comMed.forEach((r) => { ids[r.id] = true; });
+    linhas = linhas.filter((l) => !ids[String(l[nCol - 1])]);
+    comMed.forEach((r) => { linhas = linhas.concat(linhasMedicacao_(r, unidade)); });
+    const t = (v) => (v instanceof Date ? v.getTime() : 0);
+    linhas = linhas.map((l, i) => [l, i]).sort((a, b) => t(a[0][0]) - t(b[0][0]) || a[1] - b[1]).map((x) => x[0]);
+    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, nCol).clearContent();
+    if (linhas.length) sh.getRange(2, 1, linhas.length, nCol).setValues(linhas);
+  }
+}
+
+function abaFaltas_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(ABA_FALTAS);
+  if (!sh) {
+    sh = ss.insertSheet(ABA_FALTAS);
+    sh.getRange(1, 1, 1, CABECALHO_FALTAS.length).setValues([CABECALHO_FALTAS]).setFontWeight("bold").setBackground("#b3362f").setFontColor("#ffffff");
+    sh.setFrozenRows(1);
+    const n = sh.getMaxRows() - 1;
+    sh.getRange(2, 1, n, 1).setNumberFormat("@");
+    sh.getRange(2, 2, n, 1).setNumberFormat("dd/mm/yyyy");
+    sh.getRange(2, 6, n, 2).setNumberFormat("dd/mm/yyyy hh:mm");
+    sh.getRange(2, 9, n, 1).setNumberFormat("@");
+    sh.getRange(2, 11, n, 1).setNumberFormat("@");
+    sh.hideColumns(9, 1);
+    sh.hideColumns(11, 1);
+    sh.hideColumns(1, 1);
+  }
+  return sh;
+}
+
+function lerFaltas_(sh) {
+  const n = sh.getLastRow() - 1;
+  if (n < 1) return [];
+  const tz = Session.getScriptTimeZone();
+  return sh.getRange(2, 1, n, COLUNAS_FALTAS.length).getValues().map((l) => {
+    const f = {};
+    COLUNAS_FALTAS.forEach((c, i) => {
+      let v = l[i];
+      if (v instanceof Date) v = c === "data" ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v.toISOString();
+      f[c] = v === null || v === undefined ? "" : v;
+    });
+    f.excluido = f.excluido === true || String(f.excluido).toUpperCase() === "TRUE";
+    f.atualizado_em = String(f.atualizado_em);
+    return f;
+  }).filter((f) => f.id);
+}
+
+function linhaFalta_(f) {
+  const data = (v) => {
+    if (!v) return "";
+    const d = String(v).length === 10 ? new Date(Number(v.slice(0, 4)), Number(v.slice(5, 7)) - 1, Number(v.slice(8, 10))) : new Date(v);
+    return isNaN(d) ? "" : d;
+  };
+  return COLUNAS_FALTAS.map((c) => {
+    const v = f[c];
+    if (c === "data" || c === "criado_em" || c === "reposto_em") return data(v);
+    if (c === "excluido") return v === true;
+    return v === undefined || v === null ? "" : v;
+  });
+}
+
+// Grava o que veio do celular (versão mais nova vence) e devolve todas as faltas
+function sincronizarFaltas_(recebidas, usuario) {
+  const sh = abaFaltas_();
+  const lista = lerFaltas_(sh);
+  const indice = {};
+  lista.forEach((f, i) => { indice[f.id] = i; });
+  const novas = [];
+  recebidas.forEach((f) => {
+    if (!f || !f.id) return;
+    const pos = indice[f.id];
+    if (pos !== undefined) {
+      const atual = lista[pos];
+      if (String(atual.atualizado_em) >= String(f.atualizado_em)) return;
+      f.registrado_por = atual.registrado_por;
+      f.criado_em = atual.criado_em;
+      if (f.reposto_em && !atual.reposto_em) f.reposto_por = usuario.nome;
+      sh.getRange(pos + 2, 1, 1, COLUNAS_FALTAS.length).setValues([linhaFalta_(f)]);
+      lista[pos] = f;
+    } else {
+      f.registrado_por = usuario.nome;
+      if (f.reposto_em) f.reposto_por = usuario.nome;
+      indice[f.id] = lista.length;
+      lista.push(f);
+      novas.push(linhaFalta_(f));
+    }
+  });
+  if (novas.length) sh.getRange(sh.getLastRow() + 1, 1, novas.length, COLUNAS_FALTAS.length).setValues(novas);
+  return lista;
+}
+
+function erro_(msg, codigo) {
+  const e = new Error(msg);
+  e.codigo = codigo;
+  return e;
+}

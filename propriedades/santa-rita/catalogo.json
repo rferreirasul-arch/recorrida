@@ -1,0 +1,284 @@
+{
+ "potreiros": [
+  [
+   "Açudezinho"
+  ],
+  [
+   "Alto Grande"
+  ],
+  [
+   "Andreu arroio"
+  ],
+  [
+   "Aruana Banheiro"
+  ],
+  [
+   "Aruana Sinuelo"
+  ],
+  [
+   "Banhado"
+  ],
+  [
+   "Banhado Sudão"
+  ],
+  [
+   "Banhado trevinho"
+  ],
+  [
+   "Banheiro"
+  ],
+  [
+   "Brachiaria Banheiro"
+  ],
+  [
+   "Brachiaria Capororoca"
+  ],
+  [
+   "Brachiaria Sinuelo"
+  ],
+  [
+   "Campo Novo"
+  ],
+  [
+   "Capororoca"
+  ],
+  [
+   "Chico"
+  ],
+  [
+   "Chico arroio (sarandy)",
+   "chico arroio; sarandi"
+  ],
+  [
+   "Chico miroca (silencio)",
+   "chico miroca; silêncio"
+  ],
+  [
+   "Chico sinuelo (sementeira)",
+   "chico sementeira; chico sinuelo"
+  ],
+  [
+   "Elbio"
+  ],
+  [
+   "Felomena",
+   "filomena"
+  ],
+  [
+   "Felomena Banhado",
+   "filomena banhado"
+  ],
+  [
+   "Felomena Meio",
+   "filomena meio"
+  ],
+  [
+   "Festuca"
+  ],
+  [
+   "Fundo"
+  ],
+  [
+   "Frente"
+  ],
+  [
+   "Gelia Banhado"
+  ],
+  [
+   "Gelia Frente"
+  ],
+  [
+   "Gelia Fundo"
+  ],
+  [
+   "Gelia Umbu"
+  ],
+  [
+   "Gomos"
+  ],
+  [
+   "JC"
+  ],
+  [
+   "Lucia Helena"
+  ],
+  [
+   "Miroca"
+  ],
+  [
+   "Miroca cerro"
+  ],
+  [
+   "Miroca açude"
+  ],
+  [
+   "Miroca fundo"
+  ],
+  [
+   "Nina"
+  ],
+  [
+   "Nina frente"
+  ],
+  [
+   "Pastagem Banhado"
+  ],
+  [
+   "Pastagem Felomena",
+   "pastagem filomena"
+  ],
+  [
+   "Pastagem Sinuelo"
+  ],
+  [
+   "Potreirinho",
+   "potrerinho"
+  ],
+  [
+   "Ratão Alto"
+  ],
+  [
+   "Ratão Frente"
+  ],
+  [
+   "Ratão Fundo"
+  ],
+  [
+   "Ratinho"
+  ],
+  [
+   "Rodizio Sinuelo"
+  ],
+  [
+   "Rodizio"
+  ],
+  [
+   "Rodizio Potreirinho",
+   "rodízios potreirinho"
+  ],
+  [
+   "Rodizio frente"
+  ],
+  [
+   "Sementeira",
+   "sementera"
+  ],
+  [
+   "Sinuelo"
+  ],
+  [
+   "Umbu"
+  ],
+  [
+   "Zuri"
+  ]
+ ],
+ "minerais": [
+  [
+   "Advance",
+   "avanço",
+   ""
+  ],
+  [
+   "Aveia Azevém",
+   "AA",
+   30
+  ],
+  [
+   "Bovigold Pasto",
+   "",
+   30
+  ],
+  [
+   "Energético 25 M",
+   "PE25",
+   30
+  ],
+  [
+   "Engorda",
+   "",
+   30
+  ],
+  [
+   "Fosbovinho ADE",
+   "fós bovinho; fosbovin",
+   25
+  ],
+  [
+   "Pampero",
+   "pampeiro",
+   30
+  ],
+  [
+   "Proteico 30 M",
+   "proteico; P30",
+   30
+  ],
+  [
+   "Reprodução",
+   "",
+   30
+  ],
+  [
+   "Seca",
+   "",
+   30
+  ],
+  [
+   "Pasto Crina",
+   "pasto e crina",
+   25
+  ],
+  [
+   "Ração",
+   "rasão",
+   ""
+  ]
+ ],
+ "categorias": [
+  [
+   "Vacas",
+   "vaca; vc"
+  ],
+  [
+   "Vacas com cria",
+   "vaca com cria; vacas c cria; vc com cria"
+  ],
+  [
+   "Novilhas",
+   "vaq; vaquilhona; vq"
+  ],
+  [
+   "Novilhos",
+   "boi; bois"
+  ],
+  [
+   "Terneiros",
+   "ternero; terneira"
+  ],
+  [
+   "Touros",
+   "boluti; toro; touro"
+  ],
+  [
+   "Ovelhas",
+   "",
+   "Ovino"
+  ],
+  [
+   "Cordeiros",
+   "",
+   "Ovino"
+  ],
+  [
+   "Borregas",
+   "",
+   "Ovino"
+  ],
+  [
+   "Carneiros",
+   "",
+   "Ovino"
+  ]
+ ]
+}

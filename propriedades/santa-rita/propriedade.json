@@ -1,0 +1,18 @@
+{
+ "slug": "santa-rita",
+ "congelada": true,
+ "_nota": "App em uso: não é gerado por esta ferramenta. Continua no repositório santa-rita-recorrida, como está. Aqui ficam só as imagens padrão e o catálogo de referência.",
+ "nomeCompleto": "Fazenda Santa Rita",
+ "nomeCurto": "Santa Rita",
+ "nomeIcone": "Recorrida",
+ "corTema": "#4a2814",
+ "corFundo": "#f1ece4",
+ "apiUrl": "https://script.google.com/macros/s/AKfycbzKGTvorw4ha-agKuTnCnT72zLh5PESbm-Jbt1Hs5SQScdOhRiLd01rPXRs6b55CmE/exec",
+ "clientId": "997988874349-65tdu4nmrtj1p4sgg291ftg4b1dfna7i.apps.googleusercontent.com",
+ "banco": "santa-rita-recorrida",
+ "prefixo": "srr",
+ "movOpcional": false,
+ "pastaRegistro": "Santa Rita",
+ "saida": "../santa-rita-recorrida",
+ "endereco": "https://rferreirasul-arch.github.io/santa-rita-recorrida/"
+}

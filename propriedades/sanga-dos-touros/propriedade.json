@@ -1,0 +1,18 @@
+{
+ "slug": "sanga-dos-touros",
+ "nomeCompleto": "Fazenda Sanga dos Touros",
+ "nomeCurto": "Sanga dos Touros",
+ "nomeIcone": "Sanga Touros",
+ "corTema": "#4a2814",
+ "corFundo": "#f1ece4",
+ "apiUrl": "",
+ "clientId": "997988874349-65tdu4nmrtj1p4sgg291ftg4b1dfna7i.apps.googleusercontent.com",
+ "banco": "recorrida-sanga-dos-touros",
+ "prefixo": "rec-sanga-dos-touros",
+ "movOpcional": false,
+ "pastaRegistro": "Sanga dos Touros",
+ "saida": "sanga-dos-touros",
+ "endereco": "https://rferreirasul-arch.github.io/recorrida/sanga-dos-touros/",
+ "planilhaUrl": "",
+ "posicaoFotoTopo": "58% 8%"
+}
