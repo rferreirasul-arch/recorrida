@@ -9,7 +9,7 @@ Uso (na raiz do repositório):
     uv run ferramentas/gerar_boas_vindas.py --modelo          → Recorrida app/Implantacao/Boas-vindas-Recorrida-MODELO.docx
 
 Lê de propriedades/<slug>/propriedade.json: nomeCompleto, endereco (link do app), planilhaUrl,
-nomeIcone, pastaRegistro. O contato de suporte vem de ferramentas/suporte.json.
+nomeIcone, pastaRegistro. O contato de suporte vem de Recorrida app/Implantacao/suporte.json (OneDrive).
 O que VOCÊ pede ao responsável fica em outro documento: gerar_controle.py.
 """
 import io
@@ -138,9 +138,21 @@ def gerar(d: dict, destino: Path, modelo=False):
                "o melhor é editar pelo próprio app (aba Registros), que mantém a planilha e os celulares iguais.")
 
     doc.add_heading("6. Precisa de ajuda?", level=1)
-    sup = json.loads((Path(__file__).parent / "suporte.json").read_text(encoding="utf-8"))
-    par(doc, "Dúvidas, sugestões ou problemas: **" + sup.get("nome", "") + "**" +
-        ((" · " + sup["contato"]) if sup.get("contato") else "  ·  {{CONTATO}}"))
+    # contato: Recorrida app/Implantacao/suporte.json (OneDrive, privado); sem ele, ferramentas/suporte.json
+    arq = APP / "Implantacao" / "suporte.json"
+    if not arq.exists():
+        arq = Path(__file__).parent / "suporte.json"
+    sup = json.loads(arq.read_text(encoding="utf-8"))
+    par(doc, "Dúvidas, sugestões ou problemas: fale com **" + sup.get("nome", "") + "**.")
+    linhas = []
+    if sup.get("whatsapp"):
+        linhas.append("**WhatsApp:** " + sup["whatsapp"])
+    if sup.get("email"):
+        linhas.append("**E-mail:** " + sup["email"])
+    if linhas:
+        lista(doc, linhas)
+    else:
+        par(doc, "{{CONTATO}}")
     par(doc, "Bom trabalho e boas recorridas!", italico=True, cor=MARROM)
     salvar(doc, destino)
 
