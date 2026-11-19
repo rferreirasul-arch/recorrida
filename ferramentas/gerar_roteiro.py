@@ -143,11 +143,13 @@ def main():
         "(público; nome recorrida; desmarcar \"Keep this code private\").",
         "github.com/rferreirasul-arch/recorrida → Settings → Pages → Branch **main** / root → Save.",
     ])
-    doc.add_heading("Nome do login do Google", level=2)
-    caixa(doc, "Hoje a tela de login do Google mostra **\"Fazenda Santa Rita\"** para todos os apps (é o nome do projeto no "
-               "Google Cloud). Para outras propriedades, vale trocar em console.cloud.google.com → Google Auth Platform → "
-               "Branding para um nome geral (ex.: \"Recorrida\" ou \"Aplicativos Rogério Ferreira\") e apontar a política "
-               "de privacidade para uma página geral. Muda para todos os apps (Nascimentos inclusive).")
+    doc.add_heading("Login do Google: projeto próprio \"Recorrida\"", level=2)
+    caixa(doc, "O projeto do Google Cloud usado hoje mostra **\"Fazenda Santa Rita\"** na tela de login e é o mesmo do app da "
+               "Santa Rita e do Nascimentos. Para não mexer neles, o modelo novo usa um **projeto separado, \"Recorrida\"**, "
+               "com Client ID próprio (console.cloud.google.com → novo projeto → Google Auth Platform: nome do app "
+               "\"Recorrida\", público Externo, em produção, escopos básicos: e-mail e perfil → Clientes → Aplicativo da Web, "
+               "origem https://rferreirasul-arch.github.io). Esse Client ID vai no **CLIENT_ID** do Code.gs da biblioteca e no "
+               "**clientId** do propriedade.json de cada propriedade nova.")
 
     # ------------------------------------------------------------------ 6
     doc.add_heading("6. Atualizar todas as propriedades", level=1)
@@ -171,15 +173,21 @@ def main():
                "de uma vez: dá para atualizar uma propriedade de teste primeiro (Sanga dos Touros) e as outras depois.")
 
     # ------------------------------------------------------------------ 7
-    doc.add_heading("7. Santa Rita: fica como está", level=1)
-    caixa(doc, "Decisão de 19/11/2026: o app da **Santa Rita** está em uso e **não muda**. Continua no repositório "
-               "santa-rita-recorrida, com o servidor antigo, sem biblioteca e sem a aba Configuração. O modelo novo vale, "
-               "em fase de teste, só para a **Sanga dos Touros**. No gerador, a Santa Rita está marcada como \"congelada\": "
-               "as imagens dela servem apenas de padrão para as outras propriedades.")
-    par(doc, "Se um dia a Santa Rita passar para o modelo novo, o caminho é: cópia de segurança da planilha; Ponte.gs + "
-             "biblioteca no Apps Script dela; configurar (cria a aba Configuração; Pasta Dropbox = /Fazenda Santa Rita -2023/Apps "
-             "Santa Rita); agendarExportacao; e Implantar → Gerenciar implantações → Nova versão (mantém a URL /exec). "
-             "Só depois de bem testado na Sanga dos Touros.", cor=CINZA)
+    doc.add_heading("7. Santa Rita: fica como está (e como migrar depois, sem risco)", level=1)
+    caixa(doc, "Decisão de 19/11/2026: o app da **Santa Rita** está em uso e **não muda** durante o teste. São duas instalações "
+               "independentes do mesmo app: a Santa Rita (repositório santa-rita-recorrida, planilha e servidor antigos, login "
+               "\"Fazenda Santa Rita\") e as propriedades novas (repositório recorrida, biblioteca, login \"Recorrida\"). "
+               "Endereço, planilha, servidor, login e dados no celular são separados: nada do teste chega à Santa Rita.")
+    tabela(doc, ["Fase", "O que acontece", "Risco para a Santa Rita"], [
+        ["1. Teste", "Sanga dos Touros usa o modelo novo. Ajustes no núcleo e na biblioteca valem só para ela.", "Nenhum: nada é compartilhado."],
+        ["2. Ensaio da Santa Rita", "Fazer uma **cópia** da planilha da Santa Rita; nela, Ponte.gs + biblioteca e uma implantação nova. "
+         "Gerar um app de ensaio em recorrida/santa-rita-ensaio/ (banco e prefixo próprios) e testar com os dados copiados.",
+         "Nenhum: a planilha e o app oficiais não são tocados."],
+        ["3. Virada (um dia combinado)", "Todos sincronizam. Backup da planilha oficial; nela, Ponte.gs + biblioteca e "
+         "**Gerenciar implantações → Nova versão** (a URL /exec não muda). Publicar o app gerado no repositório "
+         "santa-rita-recorrida com o mesmo banco/prefixo (srr): os celulares atualizam sozinhos e não perdem nada.",
+         "Baixo e reversível: voltar à versão anterior da implantação e reverter o commit leva minutos."],
+    ], [3.2, 9.4, 4.0])
 
     # ------------------------------------------------------------------ 8
     doc.add_heading("8. Problemas comuns", level=1)
