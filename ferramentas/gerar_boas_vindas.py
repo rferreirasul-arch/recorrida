@@ -7,6 +7,7 @@ Recorrida — documento de BOAS-VINDAS para os usuários da propriedade (enviado
 Uso (na raiz do repositório):
     uv run ferramentas/gerar_boas_vindas.py sanga-dos-touros  → Recorrida app/Propriedades/<pasta>/Boas-vindas-Recorrida-<pasta>.docx
     uv run ferramentas/gerar_boas_vindas.py --modelo          → Recorrida app/Implantacao/Boas-vindas-Recorrida-MODELO.docx
+    Acrescente --pdf para gerar também o .pdf (usa o Microsoft Word do Mac).
 
 Lê de propriedades/<slug>/propriedade.json: nomeCompleto, endereco (link do app), planilhaUrl,
 nomeIcone, pastaRegistro. O contato de suporte vem de Recorrida app/Implantacao/suporte.json (OneDrive).
@@ -24,6 +25,21 @@ from docx.shared import Cm
 
 sys.path.insert(0, str(Path(__file__).parent))
 from docx_comum import APP, CINZA, MARROM, RAIZ, caixa, lista, link, novo_documento, par, salvar, tabela  # noqa: E402
+
+
+def para_pdf(docx: Path):
+    """Salva um PDF ao lado do .docx usando o Microsoft Word (macOS)."""
+    import subprocess
+    pdf = docx.with_suffix(".pdf")
+    script = f'''with timeout of 300 seconds
+  tell application "Microsoft Word"
+    set d to open file name (POSIX file "{docx}" as text) with read only
+    save as d file name (POSIX file "{pdf}" as text) file format format PDF
+    close d saving no
+  end tell
+end timeout'''
+    subprocess.run(["osascript", "-e", script], check=True, timeout=360)
+    print("Gerado:", pdf)
 
 
 def gerar(d: dict, destino: Path, modelo=False):
@@ -155,16 +171,23 @@ def gerar(d: dict, destino: Path, modelo=False):
         par(doc, "{{CONTATO}}")
     par(doc, "Bom trabalho e boas recorridas!", italico=True, cor=MARROM)
     salvar(doc, destino)
+    return destino
 
 
 if __name__ == "__main__":
     a = sys.argv[1:]
+    pdf = "--pdf" in a
+    a = [x for x in a if x != "--pdf"]
     if not a:
         sys.exit(__doc__)
     if a[0] == "--modelo":
-        gerar({"nomeCompleto": "{{PROPRIEDADE}}"}, APP / "Implantacao/Boas-vindas-Recorrida-MODELO.docx", modelo=True)
+        f = gerar({"nomeCompleto": "{{PROPRIEDADE}}"}, APP / "Implantacao/Boas-vindas-Recorrida-MODELO.docx", modelo=True)
+        if pdf:
+            para_pdf(f)
     else:
         for slug in a:
             d = json.loads((RAIZ / "propriedades" / slug / "propriedade.json").read_text(encoding="utf-8"))
             pasta = d.get("pastaRegistro") or d["nomeCurto"]
-            gerar(d, APP / "Propriedades" / pasta / f"Boas-vindas-Recorrida-{pasta.replace(' ', '-')}.docx")
+            f = gerar(d, APP / "Propriedades" / pasta / f"Boas-vindas-Recorrida-{pasta.replace(' ', '-')}.docx")
+            if pdf:
+                para_pdf(f)
