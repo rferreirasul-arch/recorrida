@@ -18,7 +18,8 @@ const CATALOGO_INICIAL = {
     .map(([nome, alternativos = ""]) => ({ nome, alternativos, ativo: true, cochos: [null, null], contorno: "" })),
   minerais: (CAT_CFG.minerais || [])
     .map(([nome, alternativos = "", kg = ""]) => ({ nome, alternativos, kg, ativo: true })),
-  medicamentos: [],
+  medicamentos: (CAT_CFG.medicamentos || [])
+    .map(([nome, alternativos = "", unidade = "mL", tipo = ""]) => ({ nome, alternativos, unidade, ativo: true, tipo })),
   categorias: (CAT_CFG.categorias || [])
     .map(([nome, alternativos = "", especie = "Bov"]) => ({ nome, alternativos, ativo: true, especie })),
 };

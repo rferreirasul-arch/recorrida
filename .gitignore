@@ -1,2 +1,6 @@
 .DS_Store
 __pycache__/
+
+# Cópias de teste locais (modo demonstração): não vão para o GitHub
+*-teste/
+propriedades/*-teste/
