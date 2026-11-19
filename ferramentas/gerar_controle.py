@@ -29,7 +29,7 @@ ITENS = [
      "• Minerais: produtos do cocho e kg por saco;\n"
      "• Categorias: conferir a sugestão e numerar na **ordem em que devem aparecer no app**;\n"
      "• Medicamentos: produto, tipo e unidade da dose;\n"
-     "• Aba Propriedade: nome, responsável, movimentação opcional (SIM/NÃO), Dropbox."),
+     "• Aba Propriedade: nome, responsável, movimentação opcional (SIM/NÃO)."),
     ("Marca / logo",
      "O arquivo original, o maior que tiverem (de preferência PNG com fundo transparente, SVG ou PDF da gráfica). "
      "Se só houver foto ou print, serve: será redesenhado (vetorizado)."),

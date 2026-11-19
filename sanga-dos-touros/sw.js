@@ -2,7 +2,7 @@
 // Com sinal, o app sempre pega a versão mais nova do GitHub. Arquivo gerado por
 // ferramentas/gerar.py (não edite na pasta da propriedade; edite nucleo/sw.js).
 const PREFIXO = "rec-sanga-dos-touros"; // cada propriedade tem o seu (todas ficam no mesmo endereço github.io)
-const VERSAO = `${PREFIXO}-v5898788a`; // apaga só as versões antigas desta propriedade
+const VERSAO = `${PREFIXO}-v9217a114`; // apaga só as versões antigas desta propriedade
 const FONTES = `${PREFIXO}-fontes`;
 const ARQUIVOS = [
   "./", "index.html", "styles.css", "app.js", "config.js", "manifest.webmanifest",

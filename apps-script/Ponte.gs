@@ -16,12 +16,13 @@
 // Link da planilha de cadastro da propriedade, já aberta no Google Planilhas (só para importarCadastro)
 const CADASTRO_URL = "";
 
-// Entrega à biblioteca os serviços DESTE script (propriedades do Dropbox, cache de login e trava)
+// Entrega à biblioteca os serviços DESTE script (planilha, propriedades, cache de login e trava)
 function servicos_() {
   RecorridaNucleo.usarServicos({
     props: PropertiesService.getScriptProperties(),
     cache: CacheService.getScriptCache(),
     lock: LockService.getScriptLock(),
+    ss: SpreadsheetApp.getActive(),
   });
   return RecorridaNucleo;
 }
@@ -44,15 +45,4 @@ function onEdit(e) {
 }
 function atualizarPainel() { servicos_().atualizarPainel(); }
 
-// Cópia diária no Dropbox (pasta e arquivo: aba Configuração)
-function dropboxConectar() { servicos_().dropboxConectar(); }
-function exportarParaDropbox() { servicos_().exportarParaDropbox(); }
-// O agendamento fica aqui (e não na biblioteca) para o gatilho ser desta planilha
-function agendarExportacao() {
-  ScriptApp.getProjectTriggers()
-    .filter((t) => t.getHandlerFunction() === "exportarParaDropbox")
-    .forEach((t) => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger("exportarParaDropbox").timeBased()
-    .everyDays(1).atHour(5).nearMinute(0).inTimezone("America/Sao_Paulo").create();
-  Logger.log("Exportação agendada para todo dia às 5h.");
-}
+// Cópia diária no Dropbox: só a Santa Rita usa. Se precisar, cole o Ponte-Dropbox.gs como 2º arquivo.

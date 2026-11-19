@@ -117,7 +117,10 @@ Unidade, tipo e espécie mostram os já usados na planilha, com a opção de dig
 
 Passo a passo completo: `Recorrida app/Implantacao/Roteiro-implantacao-Recorrida.docx`.
 
-## Cópia diária no Dropbox
+## Cópia diária no Dropbox (só Santa Rita)
+
+As outras propriedades não usam. Na biblioteca o código continua (`Dropbox.gs`), mas só funciona numa planilha que
+tenha o `Ponte-Dropbox.gs` e as linhas "Pasta Dropbox"/"Arquivo Dropbox" na aba Configuração.
 
 Todo dia, perto das **5h**, o Apps Script grava o arquivo da linha **Arquivo Dropbox** da aba Configuração
 (padrão `Recorrida - consulta.xlsx`) na pasta da linha **Pasta Dropbox** (Santa Rita: `/Fazenda Santa Rita -2023/Apps Santa Rita`),

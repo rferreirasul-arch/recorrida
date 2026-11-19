@@ -34,7 +34,7 @@ def main():
                                               "(a Santa Rita **não** usa este modelo: continua como está, em …/santa-rita-recorrida/)"],
         ["Servidor (igual para todas)", "Biblioteca Apps Script **Recorrida Núcleo** (arquivos em recorrida/apps-script/: Code, Painel, Dropbox, Cadastro)"],
         ["Servidor de cada propriedade", "Planilha \"<Nome> Recorrida\" → Apps Script com **só o Ponte.gs**, que chama a biblioteca"],
-        ["O que muda sem republicar", "Aba **Configuração** da planilha (nome, movimentação opcional, pasta do Dropbox)"],
+        ["O que muda sem republicar", "Aba **Configuração** da planilha (nome, movimentação opcional)"],
         ["Documentos e registros", "OneDrive: **Aplicativos/Recorrida app/** (Implantacao, Propriedades/<Nome>, Referencias, Historico)"],
         ["Logo e fotos de cada propriedade", "Recorrida app/Propriedades/<Nome>/**marca/** (regras no LEIA-ME.txt da pasta)"],
     ], [5.6, 11.0])
@@ -69,7 +69,6 @@ def main():
         "**Imagens (opcional):** a marca (arquivo original; se só houver foto, será vetorizada) e uma foto horizontal "
         "de referência para o topo do app, com o nome do autor. Sem imagens, ficam as padrão. A tela de entrada é igual "
         "para todas (Recorrida, foto do Juca e a homenagem).",
-        "**Dropbox (opcional):** se querem a cópia diária em Excel e em qual pasta.",
     ])
 
     # ------------------------------------------------------------------ 4
@@ -100,8 +99,6 @@ def main():
         "No Ponte.gs, colar o link em **CADASTRO_URL** → salvar → executar **importarCadastro**. Ver o resultado no Registro de execução.",
         "Conferir as abas Usuarios, Potreiros, Categorias, Minerais, Medicamentos e **Configuração** "
         "(Propriedade e Movimentação opcional já vêm do cadastro).",
-        "Se tiver Dropbox: preencher \"Pasta Dropbox\" na Configuração, colocar DROPBOX_APP_KEY e DROPBOX_APP_SECRET nas "
-        "Propriedades do script, rodar dropboxConectar (2 vezes, ver o LEIA-ME), exportarParaDropbox e agendarExportacao.",
         "**Implantar → Nova implantação → App da Web**: executar como **Eu**; quem pode acessar: **Qualquer pessoa**. Copiar a URL /exec.",
         "Abrir a URL /exec no navegador: deve aparecer \"Recorrida (<Nome>): servidor ativo.\"",
     ])

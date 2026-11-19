@@ -9,7 +9,7 @@
  * O que muda de uma propriedade para outra fica na aba "Configuração" da planilha.
  */
 
-const CLIENT_ID = "997988874349-65tdu4nmrtj1p4sgg291ftg4b1dfna7i.apps.googleusercontent.com";
+const CLIENT_ID = "535160078307-ikc13ntrm8k3kmfam4o2fmatok2gbipo.apps.googleusercontent.com"; // projeto Google Cloud "Recorrida" (login mostra "Recorrida")
 
 // ---------------------------------------------------------------------
 // Serviços do script da planilha. Numa biblioteca, Propriedades, Cache e Lock "do script"
@@ -21,6 +21,8 @@ function usarServicos(s) { Object.assign(SERVICOS_, s || {}); }
 const props_ = () => SERVICOS_.props || PropertiesService.getScriptProperties();
 const cache_ = () => SERVICOS_.cache || CacheService.getScriptCache();
 const lock_ = () => SERVICOS_.lock || LockService.getScriptLock();
+// Numa biblioteca, SpreadsheetApp.getActive() volta null: a ponte entrega a planilha em usarServicos({ ss })
+const planilha_ = () => SERVICOS_.ss || SpreadsheetApp.getActive();
 
 const ABA_REGISTROS = "Recorridas";
 const ABA_POTREIROS = "Potreiros";
@@ -35,10 +37,8 @@ const ABA_MOVIMENTACOES = "Movimentações"; // eventos de animais: faltando, mo
 const ABA_CONFIG = "Configuração";        // o que muda de uma propriedade para outra (Chave | Valor)
 // Linhas da aba Configuração: [chave, valor padrão, explicação]
 const CONFIG_PADRAO = [
-  ["Propriedade", "", "Nome da propriedade (aparece na cópia do Dropbox e no teste do servidor)."],
+  ["Propriedade", "", "Nome da propriedade (aparece no teste do servidor)."],
   ["Movimentação opcional", "NÃO", "NÃO (como na Santa Rita): quando a contagem muda, o app já abre o quadro \"O que aconteceu?\" (morte, venda, transferência...). SIM: o quadro só abre se a pessoa ligar \"Registrar o que mudou\"; sem ligar, salva só a contagem. Vale nos aparelhos depois da próxima sincronização."],
-  ["Pasta Dropbox", "", "Pasta da cópia diária no Dropbox (ex.: /Fazenda X/Apps). Vazio: não exporta."],
-  ["Arquivo Dropbox", "Recorrida - consulta.xlsx", "Nome do arquivo .xlsx da cópia diária."],
 ];
 
 const CABECALHO_MEDICAMENTOS = ["Medicamento", "Nomes alternativos", "Unidade da dose", "Ativo (SIM/NÃO)", "Tipo"];
@@ -105,7 +105,7 @@ const CATEGORIAS_INICIAIS = [];
 // Rode UMA vez pelo editor (botão Executar) para criar as abas
 // ---------------------------------------------------------------------
 function configurar() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   ss.setSpreadsheetLocale("pt_BR");
   ss.setSpreadsheetTimeZone("America/Sao_Paulo");
   const cabecalho = (sh, cab) => sh.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight("bold");
@@ -182,7 +182,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  const nome = lerConfig_()["Propriedade"] || SpreadsheetApp.getActive().getName();
+  const nome = lerConfig_()["Propriedade"] || planilha_().getName();
   return ContentService.createTextOutput("Recorrida (" + nome + "): servidor ativo.");
 }
 
@@ -190,7 +190,7 @@ function doGet() {
 // Aba Configuração (Chave | Valor | Explicação)
 // ---------------------------------------------------------------------
 function abaConfiguracao_() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA_CONFIG);
   if (!sh) {
     sh = ss.insertSheet(ABA_CONFIG);
@@ -215,7 +215,7 @@ function lerConfig_() {
   const cfg = {};
   const porNorma = {};
   CONFIG_PADRAO.forEach((c) => { cfg[c[0]] = c[1]; porNorma[norm_(c[0])] = c[0]; });
-  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_CONFIG);
+  const sh = planilha_().getSheetByName(ABA_CONFIG);
   if (sh && sh.getLastRow() > 1) {
     sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach((l) => {
       const k = porNorma[norm_(l[0])] || String(l[0]).trim();
@@ -238,7 +238,7 @@ function verificarUsuario_(token) {
   if (!token) throw erro_("Faça login com sua conta Google.", "AUTH");
 
   const cache = cache_();
-  const chave = "tk_" + SpreadsheetApp.getActive().getId().slice(0, 12) + "_" + Utilities.base64EncodeWebSafe(
+  const chave = "tk_" + planilha_().getId().slice(0, 12) + "_" + Utilities.base64EncodeWebSafe(
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)).slice(0, 40);
   let email = cache.get(chave);
 
@@ -263,7 +263,7 @@ function verificarUsuario_(token) {
 // Aparelhos liberados (chave permanente por celular)
 // ---------------------------------------------------------------------
 function abaAparelhos_() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA_APARELHOS);
   if (!sh) {
     sh = ss.insertSheet(ABA_APARELHOS);
@@ -319,7 +319,7 @@ function desativarAparelho_(chave) {
 }
 
 function usuariosAutorizados_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_USUARIOS);
+  const sh = planilha_().getSheetByName(ABA_USUARIOS);
   const mapa = {};
   if (!sh || sh.getLastRow() < 2) return mapa;
   sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues().forEach((l) => {
@@ -339,7 +339,7 @@ function sincronizar_(recebidos, alteracoes, usuario, faltasRecebidas) {
   try {
     alteracoes.forEach((a) => aplicarAlteracao_(a, usuario));
 
-    const sh = SpreadsheetApp.getActive().getSheetByName(ABA_REGISTROS);
+    const sh = planilha_().getSheetByName(ABA_REGISTROS);
     const kgSaco = {};
     lerMinerais_().forEach((m) => { kgSaco[m.nome] = m.kg; });
     const cab = garantirCabecalho_(sh, recebidos);
@@ -405,7 +405,7 @@ function linhaPorNome_(sh, nome, coluna) {
 
 function aplicarAlteracao_(a, usuario) {
   if (!a || !a.tipo) return;
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   const nome = String(a.nome || a.potreiro || "").trim().slice(0, 80);
   if (!nome) return;
 
@@ -457,7 +457,7 @@ function aplicarAlteracao_(a, usuario) {
 }
 
 function lerPotreiros_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_POTREIROS);
+  const sh = planilha_().getSheetByName(ABA_POTREIROS);
   if (!sh || sh.getLastRow() < 2) return [];
   const tz = Session.getScriptTimeZone();
   const cocho = (pos, prec, por, em) => {
@@ -480,7 +480,7 @@ function lerPotreiros_() {
 }
 
 function lerMinerais_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_MINERAIS);
+  const sh = planilha_().getSheetByName(ABA_MINERAIS);
   if (!sh || sh.getLastRow() < 2) return [];
   return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues()
     .filter((l) => String(l[0]).trim() !== "")
@@ -499,7 +499,7 @@ function colunasCategorias_(sh) {
 }
 
 function lerCategorias_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_CATEGORIAS);
+  const sh = planilha_().getSheetByName(ABA_CATEGORIAS);
   if (!sh || sh.getLastRow() < 2) return [];
   const c = colunasCategorias_(sh);
   const v = (l, i) => (i >= 0 ? String(l[i] == null ? "" : l[i]).trim() : "");
@@ -646,7 +646,7 @@ function paraLinha_(r, cab, kgSaco) {
 // Medicamentos: cadastro (aba Medicamentos) e aplicações (aba Medicações)
 // ---------------------------------------------------------------------
 function abaMedicamentos_() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA_MEDICAMENTOS);
   if (!sh) {
     sh = ss.insertSheet(ABA_MEDICAMENTOS);
@@ -671,7 +671,7 @@ function colunaTipo_(sh) {
 
 // Devolve { sh, refazer }: refazer = o cabeçalho era de uma versão anterior e as linhas precisam ser refeitas
 function abaMedicacoes_() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA_MEDICACOES);
   if (!sh) {
     sh = ss.insertSheet(ABA_MEDICACOES);
@@ -698,7 +698,7 @@ function abaMedicacoes_() {
 // Aba Movimentações (montada a partir da coluna oculta da aba Recorridas)
 // ---------------------------------------------------------------------
 function abaMovimentacoes_() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA_MOVIMENTACOES);
   let refazer = false;
   if (!sh) {
@@ -751,7 +751,7 @@ function sincronizarMovimentacoes_(tocados, todos) {
 }
 
 function lerMedicamentos_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(ABA_MEDICAMENTOS);
+  const sh = planilha_().getSheetByName(ABA_MEDICAMENTOS);
   if (!sh || sh.getLastRow() < 2) return [];
   const iTipo = colunaTipo_(sh);
   return sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(sh.getLastColumn(), 4)).getValues()
@@ -817,7 +817,7 @@ function sincronizarMedicacoes_(tocados, todos) {
 }
 
 function abaFaltas_() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA_FALTAS);
   if (!sh) {
     sh = ss.insertSheet(ABA_FALTAS);

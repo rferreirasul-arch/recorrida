@@ -16,7 +16,7 @@ function importarCadastro(url) {
   if (!url) throw new Error("Cole em CADASTRO_URL (Ponte.gs) o link da planilha de cadastro aberta no Google Planilhas.");
   const cad = SpreadsheetApp.openByUrl(url);
   configurar(); // garante as abas e a aba Configuração
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   const txt = (v) => String(v == null ? "" : v).trim();
   const sim = (v) => (ehNao_(v) ? "NÃO" : "SIM");
   const relatorio = [];

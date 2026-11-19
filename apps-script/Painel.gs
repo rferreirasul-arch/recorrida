@@ -42,7 +42,7 @@ const somaDias_ = (iso, n) => new Date(diaUTC_(iso) + n * 86400000).toISOString(
 // Cálculos (os mesmos da aba Painel do app)
 // ---------------------------------------------------------------------
 function dadosPainel_(nDias) {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   const tz = Session.getScriptTimeZone();
   const hoje = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
   const ini = somaDias_(hoje, -nDias + 1);
@@ -214,7 +214,7 @@ function txtEspeciesPainel_(lot, especieDe) {
 // Monta a aba
 // ---------------------------------------------------------------------
 function atualizarPainel() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA_PAINEL);
   if (!sh) {
     sh = ss.insertSheet(ABA_PAINEL, 0);

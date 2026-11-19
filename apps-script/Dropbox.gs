@@ -55,7 +55,7 @@ function agendarExportacao() {
 // Exportação (agendada; também pode ser rodada à mão)
 // ---------------------------------------------------------------------
 function exportarParaDropbox() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilha_();
   const cfg = lerConfig_();
   const pasta = String(cfg["Pasta Dropbox"] || "").replace(/\/+$/, "");
   const arquivo = cfg["Arquivo Dropbox"] || "Recorrida - consulta.xlsx";

@@ -157,8 +157,6 @@ def montar(destino: Path):
          "se a equipe tem pouca prática com celular. Pode ser trocado depois."),
         ("Vai enviar logo/marca? (SIM/NÃO)", "", "Mande o arquivo em separado (veja Instruções)."),
         ("Vai enviar fotos? (SIM/NÃO)", "", "Mande os arquivos em separado (veja Instruções)."),
-        ("Cópia diária no Dropbox? (SIM/NÃO)", "NÃO", "Uma cópia da planilha em Excel, atualizada todo dia, numa pasta do Dropbox."),
-        ("Pasta do Dropbox (se SIM)", "", "Ex.: /Fazenda X/Apps"),
         ("Espécies na propriedade", "", "Ex.: Bovinos e ovinos."),
         ("Observações", "", "Qualquer coisa que ajude a montar o app."),
     ]
