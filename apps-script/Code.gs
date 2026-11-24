@@ -23,6 +23,10 @@ const cache_ = () => SERVICOS_.cache || CacheService.getScriptCache();
 const lock_ = () => SERVICOS_.lock || LockService.getScriptLock();
 // Numa biblioteca, SpreadsheetApp.getActive() volta null: a ponte entrega a planilha em usarServicos({ ss })
 const planilha_ = () => SERVICOS_.ss || SpreadsheetApp.getActive();
+// As datas lidas dessa planilha são criadas no script da ponte, então o teste comum de data
+// (instanceof) falha aqui dentro. Por isso a checagem é esta, e a data é recriada antes de formatar.
+const ehData_ = (v) => Object.prototype.toString.call(v) === "[object Date]";
+const fmtData_ = (v, tz, formato) => Utilities.formatDate(new Date(v.getTime()), tz, formato);
 
 const ABA_REGISTROS = "Recorridas";
 const ABA_POTREIROS = "Potreiros";
@@ -447,7 +451,7 @@ function aplicarAlteracao_(a, usuario) {
     const col = n === 1 ? 4 : 8;
     const atual = sh.getRange(linha, col + 3).getValue();
     const em = new Date(a.em || Date.now());
-    if (atual instanceof Date && atual > em) return; // já tem marcação mais nova
+    if (ehData_(atual) && atual.getTime() > em.getTime()) return; // já tem marcação mais nova
     const lat = Number(a.lat), lon = Number(a.lon);
     if (!isFinite(lat) || !isFinite(lon)) return;
     sh.getRange(linha, col, 1, 4).setValues([[
@@ -465,7 +469,7 @@ function lerPotreiros_() {
     if (!m) return null;
     return {
       lat: Number(m[1]), lon: Number(m[2]), precisao: Number(prec) || "",
-      por: String(por || ""), em: em instanceof Date ? Utilities.formatDate(em, tz, "yyyy-MM-dd'T'HH:mm:ss") : String(em || ""),
+      por: String(por || ""), em: ehData_(em) ? fmtData_(em, tz, "yyyy-MM-dd'T'HH:mm:ss") : String(em || ""),
     };
   };
   return sh.getRange(2, 1, sh.getLastRow() - 1, CABECALHO_POTREIROS.length).getValues()
@@ -553,7 +557,7 @@ function lerRegistros_(sh, cab) {
     const r = { animais: [], minerais: [] };
     COLUNAS.forEach((c, i) => {
       let v = l[i];
-      if (v instanceof Date) v = c === "data" ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v.toISOString();
+      if (ehData_(v)) v = c === "data" ? fmtData_(v, tz, "yyyy-MM-dd") : new Date(v.getTime()).toISOString();
       r[c] = v;
     });
     if (!r.id) return;
@@ -744,7 +748,7 @@ function sincronizarMovimentacoes_(tocados, todos) {
   mexer.forEach((r) => { ids[r.id] = true; });
   linhas = linhas.filter((l) => !ids[String(l[nCol - 1])]);
   mexer.forEach((r) => { linhas = linhas.concat(linhasMovimentacao_(r)); });
-  const t = (v) => (v instanceof Date ? v.getTime() : 0);
+  const t = (v) => (ehData_(v) ? v.getTime() : 0);
   linhas = linhas.map((l, i) => [l, i]).sort((a, b) => t(a[0][0]) - t(b[0][0]) || a[1] - b[1]).map((x) => x[0]);
   if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, nCol).clearContent();
   if (linhas.length) sh.getRange(2, 1, linhas.length, nCol).setValues(linhas);
@@ -809,7 +813,7 @@ function sincronizarMedicacoes_(tocados, todos) {
     comMed.forEach((r) => { ids[r.id] = true; });
     linhas = linhas.filter((l) => !ids[String(l[nCol - 1])]);
     comMed.forEach((r) => { linhas = linhas.concat(linhasMedicacao_(r, unidade)); });
-    const t = (v) => (v instanceof Date ? v.getTime() : 0);
+    const t = (v) => (ehData_(v) ? v.getTime() : 0);
     linhas = linhas.map((l, i) => [l, i]).sort((a, b) => t(a[0][0]) - t(b[0][0]) || a[1] - b[1]).map((x) => x[0]);
     if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, nCol).clearContent();
     if (linhas.length) sh.getRange(2, 1, linhas.length, nCol).setValues(linhas);
@@ -844,7 +848,7 @@ function lerFaltas_(sh) {
     const f = {};
     COLUNAS_FALTAS.forEach((c, i) => {
       let v = l[i];
-      if (v instanceof Date) v = c === "data" ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v.toISOString();
+      if (ehData_(v)) v = c === "data" ? fmtData_(v, tz, "yyyy-MM-dd") : new Date(v.getTime()).toISOString();
       f[c] = v === null || v === undefined ? "" : v;
     });
     f.excluido = f.excluido === true || String(f.excluido).toUpperCase() === "TRUE";

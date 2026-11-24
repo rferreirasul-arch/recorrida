@@ -29,6 +29,16 @@ const CATALOGO_INICIAL = {
 const BANCO_LOCAL = CFG.BANCO || "santa-rita-recorrida";
 const CHAVE_USUARIO = (CFG.PREFIXO || "srr") + "_usuario";
 
+// A data de uma recorrida é sempre "AAAA-MM-DD". Se vier como data e hora (ex.: "2026-11-22T03:00:00.000Z",
+// como mandou a biblioteca v2/v3), volta para o dia no fuso do aparelho.
+function corrigirData(r) {
+  if (!r || typeof r.data !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(r.data)) return r;
+  const d = new Date(r.data);
+  if (isNaN(d)) return { ...r, data: r.data.slice(0, 10) };
+  const p = (n) => String(n).padStart(2, "0");
+  return { ...r, data: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` };
+}
+
 let registros = [];   // recorridas guardadas no aparelho (inclusive excluídas)
 let catalogo = CATALOGO_INICIAL;
 let alteracoes = [];  // cadastros feitos no aparelho e ainda não enviados (potreiro novo, cocho, categoria, mineral)
@@ -65,7 +75,7 @@ const db = (() => {
     });
   };
   return {
-    todos: () => tx("registros", "readonly", (s) => s.getAll()),
+    todos: () => tx("registros", "readonly", (s) => s.getAll()).then((rs) => (rs || []).map(corrigirData)),
     gravar: (r) => tx("registros", "readwrite", (s) => s.put(r)),
     gravarVarios: (rs) => tx("registros", "readwrite", (s) => { rs.forEach((r) => s.put(r)); }),
     apagar: (ids) => tx("registros", "readwrite", (s) => { ids.forEach((id) => s.delete(id)); }),
@@ -252,7 +262,7 @@ async function sincronizar(manual = false) {
       doServidor.add(s.id);
       const l = locais.get(s.id);
       if (l?._pendente && l.atualizado_em > s.atualizado_em) continue;
-      gravar.push({ ...s, _pendente: false });
+      gravar.push({ ...corrigirData(s), _pendente: false });
     }
     const remover = [...locais.values()].filter((l) => !doServidor.has(l.id) && !l._pendente).map((l) => l.id);
     await db.gravarVarios(gravar);
@@ -272,7 +282,7 @@ async function sincronizar(manual = false) {
       const locais = new Map(faltas.map((f) => [f.id, f]));
       const novas = resp.faltas.map((sv) => {
         const l = locais.get(sv.id);
-        return l?._pendente && l.atualizado_em > sv.atualizado_em ? l : { ...sv, _pendente: false };
+        return l?._pendente && l.atualizado_em > sv.atualizado_em ? l : { ...corrigirData(sv), _pendente: false };
       });
       const ids = new Set(novas.map((f) => f.id));
       faltas.filter((f) => f._pendente && !ids.has(f.id)).forEach((f) => novas.push(f));
@@ -2248,7 +2258,7 @@ function baixarCsv() {
 // =====================================================================
 // Filtro por categoria na Lotação (pode marcar mais de uma: mostra quem tem qualquer uma delas)
 const catFiltro = new Set();
-const topoFiltro = new Set(); // cartões marcados: "esp:Bovinos", "ocupados", "vazios", "sem"
+const topoFiltro = new Set(); // cartões marcados: "esp:Bovinos", "vazios" (vazio ou sem informação), "faltando"
 
 function renderLotacao() {
   const estado = estadoPotreiros();
@@ -2273,11 +2283,12 @@ function renderLotacao() {
   // Cartões de cima (espécies e situação): um ou mais, "OU" entre eles
   [...topoFiltro].forEach((k) => { if (k.startsWith("esp:") && !especies.includes(k.slice(4))) topoFiltro.delete(k); });
   const kpi = (v, r, filtro) => `<button type="button" class="kpi" data-kpi="${esc(filtro)}" aria-pressed="${topoFiltro.has(filtro)}"><b>${v}</b><span>${r}</span></button>`;
+  // Sem "Ocupados" (marcar todas as espécies dá o mesmo) e com "Vazios" + "Sem info" juntos:
+  // menos cartões, para caberem numa linha no celular
+  ["ocupados", "sem"].forEach((k) => topoFiltro.delete(k));
   const cartoes = [
     ...especies.map((e) => kpi(fmtNum(totEsp[e]), e, "esp:" + e)),
-    kpi(ocupados.length, "Ocupados", "ocupados"),
-    kpi(linhas.filter((l) => l.grupo === "vazios").length, "Vazios", "vazios"),
-    kpi(linhas.filter((l) => l.grupo === "sem").length, "Sem info", "sem"),
+    kpi(linhas.filter((l) => l.grupo !== "ocupados").length, "Vazios", "vazios"),
   ];
   // "Com falta": potreiros com animais faltando (o cartão só aparece quando há algum)
   const comFalta = linhas.filter((l) => l.grupo === "ocupados" && l.lot.faltando?.length).length;
@@ -2288,11 +2299,12 @@ function renderLotacao() {
   const passaTopo = (l) => !topoFiltro.size || [...topoFiltro].some((k) => (k.startsWith("esp:")
     ? l.grupo === "ocupados" && (porEspecie(l.lot)[k.slice(4)] || 0) > 0
     : k === "faltando" ? l.grupo === "ocupados" && !!l.lot.faltando?.length
+    : k === "vazios" ? l.grupo !== "ocupados" // vazio ou sem informação
     : l.grupo === k));
 
-  // Botões de categoria: só as dos potreiros que passaram em cima. Com espécie marcada (e sem "Ocupados"),
+  // Botões de categoria: só as dos potreiros que passaram em cima. Com espécie marcada,
   // só as categorias das espécies marcadas.
-  const todasCats = !topoFiltro.size || topoFiltro.has("ocupados") || topoFiltro.has("faltando");
+  const todasCats = !topoFiltro.size || topoFiltro.has("faltando");
   const porCat = {};
   linhas.filter((l) => l.grupo === "ocupados" && passaTopo(l)).forEach((l) => l.lot.animais.forEach((a) => {
     if (!todasCats && !espSel.includes(especieDe(a.categoria))) return;
@@ -2726,7 +2738,7 @@ async function iniciar() {
   registros = await db.todos();
   catalogo = (await db.ler("catalogo")) || structuredClone(CATALOGO_INICIAL);
   alteracoes = (await db.ler("alteracoes")) || [];
-  faltas = (await db.ler("faltas")) || [];
+  faltas = ((await db.ler("faltas")) || []).map(corrigirData);
   configPlanilha = (await db.ler("config")) || {};
   $("#falta-combo").appendChild(combo("mineral"));
   ligarEventos();
